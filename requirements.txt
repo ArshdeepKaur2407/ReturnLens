@@ -1,13 +1,8 @@
-# Production ML Inference Dependencies
 numpy>=1.26.0
 pandas>=2.2.0
 scipy>=1.15.0
 scikit-learn>=1.6.0
 xgboost>=2.0.0
 joblib>=1.4.0
-shap>=0.49.0
-
-# API Microservice
 fastapi>=0.115.0
-uvicorn>=0.30.0
 pydantic>=2.10.0

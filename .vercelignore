@@ -1,0 +1,30 @@
+# Datasets & Pickles
+Dataset/
+*.p
+
+# Reports & Visualizations (keep reports/*.csv and reports/*.md if needed, exclude heavy PNGs)
+reports/*.png
+
+# Non-Vercel runtimes & legacy servers
+server/
+app/
+notebooks/
+Dockerfile
+Procfile
+
+# Training-only scripts
+enhance_dataset.py
+generate_all_reports.py
+src/train.py
+src/evaluate.py
+src/calibrate_and_optimize.py
+
+# Dependencies & Build Caches
+node_modules/
+client/node_modules/
+server/node_modules/
+__pycache__/
+*.pyc
+*.pyo
+.git/
+.gitignore

@@ -11,7 +11,10 @@ from pathlib import Path
 from typing import Any, Dict, Tuple
 
 import joblib
-import matplotlib.pyplot as plt
+try:
+    import matplotlib.pyplot as plt
+except ImportError:
+    plt = None
 import numpy as np
 import pandas as pd
 from sklearn.metrics import (
