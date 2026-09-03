@@ -1,13 +1,15 @@
 # 🔍 ReturnLens — E-Commerce Return Risk Prediction & Cost-Aware Decision Engine
 
+[![Vercel](https://img.shields.io/badge/Vercel-Live%20Demo-black?logo=vercel)](https://return-lens-r9rt.vercel.app/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-1.0.0-009688.svg?logo=fastapi)](https://fastapi.tiangolo.com)
 [![React](https://img.shields.io/badge/React-19.0-61DAFB.svg?logo=react)](https://react.dev)
 [![XGBoost](https://img.shields.io/badge/Model-XGBoost-1565C0.svg)](https://xgboost.readthedocs.io)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10+-3776AB.svg?logo=python)](https://www.python.org/)
-[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg?logo=docker)](https://www.docker.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-> **A calibrated, cost-sensitive machine learning decision engine that detects high-risk e-commerce returns, wardrobing, and RTO fraud before order fulfillment.**
+> 🌐 **Live Interactive Platform:** **[https://return-lens-r9rt.vercel.app](https://return-lens-r9rt.vercel.app)**
+>
+> **A calibrated, cost-sensitive machine learning decision engine that detects high-risk e-commerce returns, serial returners, and RTO fraud before order fulfillment.**
 
 ---
 
