@@ -3,15 +3,34 @@ Constructs leakage-safe Scikit-Learn transformers for numeric imputation/scaling
 and categorical encoding. Computes derived domain features without target leakage.
 """
 
-from typing import List, Tuple
+from __future__ import annotations
+import json
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
-import pandas as pd
-from sklearn.base import BaseEstimator, TransformerMixin
-from sklearn.compose import ColumnTransformer
-from sklearn.impute import SimpleImputer
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import OneHotEncoder, StandardScaler
+
+try:
+    import pandas as pd
+except ImportError:
+    pd = None
+
+try:
+    from sklearn.base import BaseEstimator, TransformerMixin
+    from sklearn.compose import ColumnTransformer
+    from sklearn.impute import SimpleImputer
+    from sklearn.pipeline import Pipeline
+    from sklearn.preprocessing import OneHotEncoder, StandardScaler
+except ImportError:
+    class _Base: pass
+    class _Mixin: pass
+    BaseEstimator = _Base
+    TransformerMixin = _Mixin
+    ColumnTransformer = None
+    SimpleImputer = None
+    Pipeline = None
+    OneHotEncoder = None
+    StandardScaler = None
 
 import config
 from src.utils import get_logger, timer
@@ -156,3 +175,86 @@ def get_transformed_feature_names(preprocessor: Pipeline) -> List[str]:
             output_names.extend(cat_names.tolist())
 
     return output_names
+
+
+class LightweightInferencePreprocessor:
+    """Pure Python / NumPy inference preprocessor reproducing the exact fitted
+    Scikit-Learn ColumnTransformer pipeline without requiring scikit-learn,
+    scipy, or pandas at runtime.
+    """
+
+    def __init__(self, metadata_path_or_dict: Union[str, Path, dict]):
+        if isinstance(metadata_path_or_dict, (str, Path)):
+            with open(metadata_path_or_dict, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        else:
+            data = metadata_path_or_dict
+
+        self.current_year = data.get("current_year", 2026)
+        self.num_cols = data["num_cols"]
+        self.num_medians = np.array(data["num_medians"], dtype=np.float64)
+        self.num_means = np.array(data["num_means"], dtype=np.float64)
+        self.num_scales = np.array(data["num_scales"], dtype=np.float64)
+        self.cat_cols = data["cat_cols"]
+        self.cat_categories = data["cat_categories"]
+        self.cat_missing_token = data.get("cat_missing_token", "MISSING")
+        self.feature_names_out = data["feature_names_out"]
+
+    def transform_dict(self, raw_dict: dict) -> np.ndarray:
+        """Transforms a single transaction dictionary into the exact 73-dimensional
+        feature array expected by the XGBoost booster.
+        """
+        d = dict(raw_dict)
+
+        # 1. Derived features (identical formula to FeatureDeriver)
+        yob = d.get("yearOfBirth", 1990)
+        if yob is not None and not (isinstance(yob, float) and np.isnan(yob)):
+            age = float(np.clip(self.current_year - float(yob), 10.0, 100.0))
+        else:
+            age = 36.0
+        d["customer_age"] = age
+
+        price = d.get("avgGbpPrice")
+        discount = d.get("avgDiscountValue", 0.0)
+        if discount is None or (isinstance(discount, float) and np.isnan(discount)):
+            discount = 0.0
+        if price is None or (isinstance(price, float) and np.isnan(price)):
+            d["discount_ratio"] = 0.0
+            d["net_price"] = 0.0
+        else:
+            price = float(price)
+            discount = float(discount)
+            d["discount_ratio"] = float(np.clip(discount / (price + 1e-4), 0.0, 1.0))
+            d["net_price"] = float(max(0.0, price - discount))
+
+        # 2. Impute and scale numeric features: (x - mean) / scale
+        num_vals = []
+        for i, col in enumerate(self.num_cols):
+            v = d.get(col)
+            if v is None or (isinstance(v, float) and np.isnan(v)):
+                v = self.num_medians[i]
+            scaled = (float(v) - self.num_means[i]) / self.num_scales[i]
+            num_vals.append(scaled)
+
+        # 3. Categorical one-hot encoding
+        cat_vals = []
+        for col in self.cat_cols:
+            raw_cat = d.get(col)
+            if raw_cat is None or raw_cat == "":
+                raw_cat = self.cat_missing_token
+            for c in self.cat_categories[col]:
+                cat_vals.append(1.0 if str(raw_cat) == c else 0.0)
+
+        return np.array(num_vals + cat_vals, dtype=np.float64).reshape(1, -1)
+
+    def transform(self, raw_input: Any) -> np.ndarray:
+        """Universal transform method supporting dicts, DataFrames, and lists."""
+        if isinstance(raw_input, dict):
+            return self.transform_dict(raw_input)
+        elif hasattr(raw_input, "to_dict"):
+            records = raw_input.to_dict(orient="records")
+            return np.vstack([self.transform_dict(r) for r in records])
+        elif isinstance(raw_input, list) and len(raw_input) > 0 and isinstance(raw_input[0], dict):
+            return np.vstack([self.transform_dict(r) for r in raw_input])
+        return np.asarray(raw_input, dtype=np.float64)
+

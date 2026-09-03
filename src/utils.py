@@ -10,25 +10,38 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Dict, Tuple
 
-import joblib
+try:
+    import joblib
+except ImportError:
+    joblib = None
+
 try:
     import matplotlib.pyplot as plt
 except ImportError:
     plt = None
+
 import numpy as np
-import pandas as pd
-from sklearn.metrics import (
-    accuracy_score,
-    average_precision_score,
-    brier_score_loss,
-    confusion_matrix,
-    f1_score,
-    precision_recall_curve,
-    precision_score,
-    recall_score,
-    roc_auc_score,
-    roc_curve,
-)
+
+try:
+    import pandas as pd
+except ImportError:
+    pd = None
+
+try:
+    from sklearn.metrics import (
+        accuracy_score,
+        average_precision_score,
+        brier_score_loss,
+        confusion_matrix,
+        f1_score,
+        precision_recall_curve,
+        precision_score,
+        recall_score,
+        roc_auc_score,
+        roc_curve,
+    )
+except ImportError:
+    pass
 
 import config
 
@@ -122,4 +135,6 @@ def load_artifact(path: Path) -> Any:
     if str(path).endswith(".json"):
         with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
+    if joblib is None:
+        raise ImportError(f"joblib is required to load binary artifact {path}")
     return joblib.load(path)

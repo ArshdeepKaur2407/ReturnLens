@@ -2,47 +2,74 @@
 Computes global TreeSHAP feature importance, generates summary plots, and computes
 per-prediction local factor attributions for individual transactions.
 """
-
+from __future__ import annotations
 import json
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 try:
     import matplotlib.pyplot as plt
 except ImportError:
     plt = None
 import numpy as np
-import pandas as pd
+try:
+    import pandas as pd
+except ImportError:
+    pd = None
 import xgboost as xgb
-from sklearn.pipeline import Pipeline
+try:
+    from sklearn.pipeline import Pipeline
+except ImportError:
+    Pipeline = None
 
-import config
-from src.data_loading import load_and_join_data
+try:
+    from src.data_loading import load_and_join_data
+except ImportError:
+    load_and_join_data = None
 from src.utils import classify_risk, get_logger, load_artifact, save_artifact, timer
 
 logger = get_logger("ReturnLens.SHAP")
 
 
 class ReturnRiskExplainer:
-    """Provides fast, native TreeSHAP local and global risk factor attributions."""
+    """Provides fast, native TreeSHAP local and global risk factor attributions
+    supporting both Scikit-Learn pipelines and standalone native XGBoost Boosters.
+    """
 
-    def __init__(self, pipeline: Pipeline, feature_names: List[str]):
-        self.pipeline = pipeline
+    def __init__(
+        self,
+        model: Any,
+        feature_names: List[str],
+        preprocessor: Optional[Any] = None,
+    ):
         self.feature_names = feature_names
-        self.preprocessor = pipeline.named_steps["preprocessor"]
-        self.classifier = pipeline.named_steps["classifier"]
+        self.preprocessor = preprocessor
 
-        # If classifier is XGBoost, obtain booster for native C++ TreeSHAP
-        if hasattr(self.classifier, "get_booster"):
-            self.booster = self.classifier.get_booster()
+        if isinstance(model, xgb.Booster):
+            self.booster = model
+            self.pipeline = None
+            self.classifier = None
             self.is_xgboost = True
-            logger.info("Initialized native XGBoost TreeSHAP engine.")
+            logger.info("Initialized native XGBoost Booster TreeSHAP engine.")
+        elif hasattr(model, "named_steps"):
+            self.pipeline = model
+            if self.preprocessor is None:
+                self.preprocessor = model.named_steps["preprocessor"]
+            self.classifier = model.named_steps["classifier"]
+            if hasattr(self.classifier, "get_booster"):
+                self.booster = self.classifier.get_booster()
+                self.is_xgboost = True
+                logger.info("Initialized native XGBoost TreeSHAP engine.")
+            else:
+                self.booster = None
+                self.is_xgboost = False
         else:
-            self.booster = None
-            self.is_xgboost = False
+            self.booster = model
+            self.pipeline = None
+            self.is_xgboost = True
 
     def compute_shap_values(self, X_trans: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         """Computes TreeSHAP feature values and bias term for a transformed matrix."""
-        if self.is_xgboost:
+        if self.is_xgboost and self.booster is not None:
             dmat = xgb.DMatrix(X_trans)
             contribs = self.booster.predict(dmat, pred_contribs=True)
             # Last column is base value / bias
@@ -50,7 +77,7 @@ class ReturnRiskExplainer:
             bias = contribs[:, -1]
             return shap_vals, bias
         else:
-            # Fallback for other tree models
+            # Fallback for non-XGBoost tree models if shap is installed
             import shap
             explainer = shap.TreeExplainer(self.classifier)
             shap_vals = explainer.shap_values(X_trans)
@@ -60,20 +87,24 @@ class ReturnRiskExplainer:
 
     def explain_instance(
         self,
-        raw_row: pd.DataFrame,
+        raw_row: Any,
         top_k: int = 3,
     ) -> Dict[str, Any]:
-        """Explains a single transaction input row.
-
-        Returns:
-            return_probability: Predicted probability (float).
-            risk_category: Risk tier string.
-            recommendation: Risk guidance string.
-            top_factors: Human-readable top contributing risk factors.
-        """
+        """Explains a single transaction input (dict or DataFrame)."""
         # Transform through preprocessor
-        X_trans = self.preprocessor.transform(raw_row)
-        proba = float(self.pipeline.predict_proba(raw_row)[0, 1])
+        if hasattr(self.preprocessor, "transform_dict") and isinstance(raw_row, dict):
+            X_trans = self.preprocessor.transform_dict(raw_row)
+        elif hasattr(self.preprocessor, "transform"):
+            X_trans = self.preprocessor.transform(raw_row)
+        else:
+            X_trans = np.asarray(raw_row, dtype=np.float32)
+
+        if self.booster is not None:
+            dmat = xgb.DMatrix(X_trans)
+            proba = float(self.booster.predict(dmat)[0])
+        else:
+            proba = float(self.pipeline.predict_proba(raw_row)[0, 1])
+
         risk_category, recommendation = classify_risk(proba)
 
         # Compute SHAP values for single instance
@@ -104,27 +135,37 @@ class ReturnRiskExplainer:
             "top_factors": top_factors,
         }
 
-    def _make_human_readable(self, feat_name: str, raw_row: pd.DataFrame) -> str:
+    def _get_val(self, raw_row: Any, col: str, default: Any = None) -> Any:
+        if isinstance(raw_row, dict):
+            val = raw_row.get(col, default)
+            return default if val is None else val
+        elif hasattr(raw_row, "get"):
+            series = raw_row.get(col)
+            if series is not None:
+                if hasattr(series, "values") and len(series.values) > 0:
+                    val = series.values[0]
+                    return default if (pd is not None and pd.isna(val)) else val
+                elif isinstance(series, (list, tuple)) and len(series) > 0:
+                    return series[0]
+        return default
+
+    def _make_human_readable(self, feat_name: str, raw_row: Any) -> str:
         """Translates internal feature names into plain-English risk driver descriptions."""
         if "customerReturnRate" in feat_name:
-            val = raw_row.get("customerReturnRate", [0.5]).values[0]
-            if pd.isna(val):
+            val = self._get_val(raw_row, "customerReturnRate", None)
+            if val is None:
                 return "Cold-Start Customer (Baseline Population Return Propensity)"
             return f"High Customer Historical Return Rate ({float(val)*100:.1f}%)"
         elif "productReturnRate" in feat_name:
-            val = raw_row.get("productReturnRate", [0.4]).values[0]
-            if pd.isna(val):
+            val = self._get_val(raw_row, "productReturnRate", None)
+            if val is None:
                 return "Cold-Start Product Category (Baseline Return Propensity)"
             return f"Elevated Product Category Return Rate ({float(val)*100:.1f}%)"
         elif "returnsPerCustomer" in feat_name:
-            val = raw_row.get("returnsPerCustomer", [0]).values[0]
-            if pd.isna(val):
-                return "Customer Return Volume Profile"
+            val = self._get_val(raw_row, "returnsPerCustomer", 0)
             return f"Frequent Past Returns by Customer ({int(val)} total returns)"
         elif "avgGbpPrice" in feat_name:
-            val = raw_row.get("avgGbpPrice", [25.0]).values[0]
-            if pd.isna(val):
-                return "Item Catalog Valuation Profile"
+            val = self._get_val(raw_row, "avgGbpPrice", 25.0)
             return f"High Item Value (£{float(val):.2f})"
         elif "avgDiscountValue" in feat_name or "discount_ratio" in feat_name:
             return "Heavy Discount Arbitrage Risk"

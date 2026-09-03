@@ -15,7 +15,11 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-import pandas as pd
+try:
+    import pandas as pd
+except ImportError:
+    pd = None
+import xgboost as xgb
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
@@ -23,6 +27,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 import config
+from src.feature_engineering import LightweightInferencePreprocessor
 from src.shap_analysis import ReturnRiskExplainer
 from src.utils import classify_risk, get_logger, load_artifact
 
@@ -50,26 +55,57 @@ SAMPLE_PRODUCTS = [
 
 
 def load_model_state():
-    """Loads all model artifacts, thresholds, and explainers into global memory."""
+    """Loads lightweight native booster and preprocessor into global memory."""
     try:
-        pipeline = load_artifact(config.MODEL_PATH)
-        metadata = load_artifact(config.METADATA_PATH)
-        threshold_config = (
-            load_artifact(config.THRESHOLD_PATH)
-            if config.THRESHOLD_PATH.exists()
-            else {"optimal_threshold": 0.19, "threshold": 0.19, "fp_cost": 5.0, "fn_cost": 25.0}
-        )
+        booster_path = PROJECT_ROOT / "models" / "best_model_booster.json"
+        preprocessor_path = PROJECT_ROOT / "models" / "inference_preprocessor.json"
+        threshold_path = PROJECT_ROOT / "models" / "threshold.json"
 
-        app_state["pipeline"] = pipeline
-        app_state["metadata"] = metadata
-        app_state["threshold_config"] = threshold_config
-        app_state["explainer"] = ReturnRiskExplainer(
-            pipeline, metadata["transformed_feature_names"]
-        )
-        logger.info("All model artifacts and explainers successfully loaded into memory.")
+        # Preferred lightweight path (no sklearn, no scipy, no pandas required)
+        if booster_path.exists() and preprocessor_path.exists():
+            booster = xgb.Booster()
+            booster.load_model(str(booster_path))
+            preprocessor = LightweightInferencePreprocessor(preprocessor_path)
+
+            with open(preprocessor_path, "r", encoding="utf-8") as f:
+                prep_json = json.load(f)
+            feature_names = prep_json["feature_names_out"]
+
+            if threshold_path.exists():
+                with open(threshold_path, "r", encoding="utf-8") as f:
+                    threshold_config = json.load(f)
+            else:
+                threshold_config = {"optimal_threshold": 0.19, "threshold": 0.19, "fp_cost": 5.0, "fn_cost": 25.0}
+
+            app_state["booster"] = booster
+            app_state["preprocessor"] = preprocessor
+            app_state["threshold_config"] = threshold_config
+            app_state["explainer"] = ReturnRiskExplainer(
+                model=booster,
+                feature_names=feature_names,
+                preprocessor=preprocessor,
+            )
+            app_state["pipeline"] = booster  # Backwards-compatible flag
+            logger.info("Lightweight XGBoost booster and native preprocessor loaded successfully.")
+        else:
+            # Fallback to standard pipeline if available
+            pipeline = load_artifact(config.MODEL_PATH)
+            metadata = load_artifact(config.METADATA_PATH)
+            threshold_config = (
+                load_artifact(config.THRESHOLD_PATH)
+                if config.THRESHOLD_PATH.exists()
+                else {"optimal_threshold": 0.19, "threshold": 0.19, "fp_cost": 5.0, "fn_cost": 25.0}
+            )
+            app_state["pipeline"] = pipeline
+            app_state["threshold_config"] = threshold_config
+            app_state["explainer"] = ReturnRiskExplainer(
+                model=pipeline, feature_names=metadata["transformed_feature_names"]
+            )
+            logger.info("Standard model pipeline loaded successfully into memory.")
     except Exception as e:
         logger.error(f"Error during model loading: {e}")
         app_state["pipeline"] = None
+        app_state["booster"] = None
 
 
 # Load immediately on module load
@@ -79,7 +115,7 @@ load_model_state()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan context manager ensuring state readiness."""
-    if app_state.get("pipeline") is None:
+    if app_state.get("pipeline") is None and app_state.get("booster") is None:
         load_model_state()
     yield
     logger.info("Shutting down ReturnLens API Service...")
@@ -101,52 +137,52 @@ app.add_middleware(
 )
 
 
+# Pydantic Schemas
 class OrderRiskRequest(BaseModel):
-    """Pydantic schema for single-order risk assessment request."""
+    """Input payload for scoring an e-commerce order."""
 
-    # Customer Attributes
-    yearOfBirth: int = Field(default=1995, ge=1900, le=2026, description="Customer birth year")
-    isMale: int = Field(default=0, ge=0, le=1, description="Gender flag (1 = Male, 0 = Female/Other)")
-    shippingCountry: str = Field(default="Country_A", description="Shipping destination country code")
-    premier: int = Field(default=0, ge=0, le=1, description="VIP / Loyalty subscription member flag")
-    salesPerCustomer: int = Field(default=8, ge=0, description="Customer lifetime order count")
-    returnsPerCustomer: int = Field(default=3, ge=0, description="Customer lifetime returned items")
-    customerReturnRate: Optional[float] = Field(default=None, ge=0.0, le=1.0, description="Historical customer return rate")
+    # Demographic attributes
+    yearOfBirth: Optional[int] = Field(default=1990, ge=1920, le=2020)
+    isMale: Optional[int] = Field(default=0, ge=0, le=1)
+    premier: Optional[int] = Field(default=0, ge=0, le=1)
+    shippingCountry: Optional[str] = Field(default="Country_A")
 
-    # Product Attributes
-    productType: str = Field(default="productType_B", description="Product catalog category")
-    brandDesc: str = Field(default="Brand_K", description="Brand identifier")
-    avgGbpPrice: float = Field(default=35.0, ge=0.0, description="Item average price in GBP (£)")
-    avgDiscountValue: float = Field(default=5.0, ge=0.0, description="Applied discount in GBP (£)")
-    salesPerProduct: int = Field(default=45, ge=0, description="Product lifetime sales volume")
-    returnsPerProduct: int = Field(default=15, ge=0, description="Product lifetime returned volume")
-    productReturnRate: Optional[float] = Field(default=None, ge=0.0, le=1.0, description="Product historical return rate")
-
-    # Optional return code distributions
+    # Customer behavioral profiles
+    salesPerCustomer: Optional[int] = Field(default=5, ge=0)
+    returnsPerCustomer: Optional[int] = Field(default=1, ge=0)
+    customerReturnRate: Optional[float] = Field(default=None, ge=0.0, le=1.0)
     customerId_level_return_code_A: float = Field(default=0.0, ge=0.0, le=1.0)
     customerId_level_return_code_B: float = Field(default=0.0, ge=0.0, le=1.0)
     customerId_level_return_code_C: float = Field(default=0.0, ge=0.0, le=1.0)
     customerId_level_return_code_D_1: float = Field(default=0.0, ge=0.0, le=1.0)
     customerId_level_return_code_E: float = Field(default=0.0, ge=0.0, le=1.0)
-    customerId_level_return_code_D_2: float = Field(default=0.3, ge=0.0, le=1.0)
+    customerId_level_return_code_D_2: float = Field(default=0.0, ge=0.0, le=1.0)
     customerId_level_return_code_F: float = Field(default=0.0, ge=0.0, le=1.0)
     customerId_level_return_code_G: float = Field(default=0.0, ge=0.0, le=1.0)
     customerId_level_return_code_H: float = Field(default=0.0, ge=0.0, le=1.0)
-    customerId_level_return_code_I: float = Field(default=0.2, ge=0.0, le=1.0)
-    customerId_level_return_code_J: float = Field(default=0.1, ge=0.0, le=1.0)
+    customerId_level_return_code_I: float = Field(default=0.0, ge=0.0, le=1.0)
+    customerId_level_return_code_J: float = Field(default=0.0, ge=0.0, le=1.0)
     customerId_level_return_code_K: float = Field(default=0.0, ge=0.0, le=1.0)
     customerId_level_return_code_L: float = Field(default=0.0, ge=0.0, le=1.0)
 
+    # Product attributes
+    productType: Optional[str] = Field(default="productType_A")
+    brandDesc: Optional[str] = Field(default="Brand_A")
+    avgGbpPrice: Optional[float] = Field(default=35.0, ge=0.0)
+    avgDiscountValue: Optional[float] = Field(default=0.0, ge=0.0)
+    salesPerProduct: Optional[int] = Field(default=50, ge=0)
+    returnsPerProduct: Optional[int] = Field(default=15, ge=0)
+    productReturnRate: Optional[float] = Field(default=None, ge=0.0, le=1.0)
     variantID_level_return_code_A: float = Field(default=0.0, ge=0.0, le=1.0)
     variantID_level_return_code_B: float = Field(default=0.0, ge=0.0, le=1.0)
     variantID_level_return_code_C: float = Field(default=0.0, ge=0.0, le=1.0)
     variantID_level_return_code_D_1: float = Field(default=0.0, ge=0.0, le=1.0)
     variantID_level_return_code_E: float = Field(default=0.0, ge=0.0, le=1.0)
-    variantID_level_return_code_D_2: float = Field(default=0.3, ge=0.0, le=1.0)
+    variantID_level_return_code_D_2: float = Field(default=0.0, ge=0.0, le=1.0)
     variantID_level_return_code_F: float = Field(default=0.0, ge=0.0, le=1.0)
     variantID_level_return_code_G: float = Field(default=0.0, ge=0.0, le=1.0)
     variantID_level_return_code_H: float = Field(default=0.0, ge=0.0, le=1.0)
-    variantID_level_return_code_I: float = Field(default=0.2, ge=0.0, le=1.0)
+    variantID_level_return_code_I: float = Field(default=0.0, ge=0.0, le=1.0)
     variantID_level_return_code_J: float = Field(default=0.1, ge=0.0, le=1.0)
     variantID_level_return_code_K: float = Field(default=0.0, ge=0.0, le=1.0)
     variantID_level_return_code_L: float = Field(default=0.0, ge=0.0, le=1.0)
@@ -172,7 +208,7 @@ class CostSimulationRequest(BaseModel):
 
 
 def run_prediction_logic(order: OrderRiskRequest) -> PredictionResponse:
-    if app_state.get("pipeline") is None or app_state.get("explainer") is None:
+    if app_state.get("explainer") is None:
         raise HTTPException(status_code=503, detail="Model pipeline is uninitialized.")
 
     data_dict = order.model_dump()
@@ -181,13 +217,12 @@ def run_prediction_logic(order: OrderRiskRequest) -> PredictionResponse:
     if data_dict.get("productReturnRate") is None:
         data_dict["productReturnRate"] = data_dict["returnsPerProduct"] / max(1, data_dict["salesPerProduct"])
 
-    df_row = pd.DataFrame([data_dict])
     explainer: ReturnRiskExplainer = app_state["explainer"]
     thresh_conf = app_state.get("threshold_config", {})
     optimal_thresh = float(thresh_conf.get("threshold", thresh_conf.get("optimal_threshold", 0.19)))
     fn_cost = float(thresh_conf.get("fn_cost", config.FN_COST))
 
-    result = explainer.explain_instance(df_row, top_k=3)
+    result = explainer.explain_instance(data_dict, top_k=3)
     prob = result["return_probability"]
     action_flag = bool(prob >= optimal_thresh)
 
@@ -220,7 +255,8 @@ def run_prediction_logic(order: OrderRiskRequest) -> PredictionResponse:
 @app.get("/api/health")
 async def health_check():
     """Health check probe."""
-    if app_state.get("pipeline") is None:
+    is_ready = app_state.get("booster") is not None or app_state.get("pipeline") is not None
+    if not is_ready:
         return {"status": "degraded", "service": "ReturnLens AI Risk Manager", "pipeline_loaded": False}
     return {
         "status": "healthy",
