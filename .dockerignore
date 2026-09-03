@@ -1,0 +1,15 @@
+# Exclude heavy raw datasets (800MB+) - inference only needs models/
+Dataset/
+*.p
+
+# Exclude dev files & node_modules
+client/node_modules/
+client/src/
+server/node_modules/
+notebooks/
+__pycache__/
+*.pyc
+*.pyo
+.git/
+.gitignore
+.env

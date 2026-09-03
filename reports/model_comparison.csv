@@ -1,0 +1,6 @@
+model_name,pr_auc,roc_auc,f1,precision,recall,accuracy,brier_score,train_time_sec
+XGBoost,0.8063,0.7768,0.7475,0.6986,0.8039,0.7014,0.1897,5.86
+LightGBM,0.8056,0.776,0.7482,0.6992,0.8047,0.7022,0.1899,4.08
+HistGradientBoosting,0.8052,0.7759,0.7484,0.6977,0.8069,0.7016,0.19,10.3
+Logistic Regression,0.8011,0.7732,0.745,0.6993,0.797,0.6999,0.1913,3.79
+Random Forest,0.7995,0.7721,0.7494,0.6905,0.8192,0.6987,0.1925,22.29

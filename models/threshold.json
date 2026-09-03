@@ -1,0 +1,36 @@
+{
+  "threshold": 0.19,
+  "fp_cost": 5.0,
+  "fn_cost": 25.0,
+  "selection_set": "validation",
+  "description": "Cost-minimizing threshold selected on validation data",
+  "optimal_threshold": 0.19,
+  "fp_cost_placeholder": 5.0,
+  "fn_cost_placeholder": 25.0,
+  "validation_brier_score": 0.1227,
+  "validation_expected_cost": 72190.0,
+  "validation_cost_savings": 647985.0,
+  "validation_flag_rate": 0.7731,
+  "risk_categories": {
+    "LOW": [
+      0.0,
+      0.3,
+      "Low risk. Proceed with standard friction-free checkout and processing."
+    ],
+    "MEDIUM": [
+      0.3,
+      0.6,
+      "Medium risk. Monitor order and apply standard post-order verification."
+    ],
+    "HIGH": [
+      0.6,
+      0.8,
+      "High risk. Apply targeted friction (e.g. sizing confirmation, return policy prompt)."
+    ],
+    "VERY_HIGH": [
+      0.8,
+      1.0,
+      "Very high risk. Manual review or require prepaid verification before fulfillment."
+    ]
+  }
+}
