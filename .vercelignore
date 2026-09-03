@@ -1,6 +1,8 @@
-# Datasets & Pickles
+# Datasets & Pickles & Legacy Binary Models
 Dataset/
 *.p
+models/*.joblib
+models/*.pkl
 
 # Reports & Visualizations (keep reports/*.csv and reports/*.md if needed, exclude heavy PNGs)
 reports/*.png

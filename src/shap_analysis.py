@@ -15,7 +15,12 @@ try:
     import pandas as pd
 except ImportError:
     pd = None
-import xgboost as xgb
+
+try:
+    import xgboost as xgb
+except ImportError:
+    xgb = None
+
 try:
     from sklearn.pipeline import Pipeline
 except ImportError:
@@ -25,14 +30,16 @@ try:
     from src.data_loading import load_and_join_data
 except ImportError:
     load_and_join_data = None
+
+from src.native_model import NativeTreeModel
 from src.utils import classify_risk, get_logger, load_artifact, save_artifact, timer
 
 logger = get_logger("ReturnLens.SHAP")
 
 
 class ReturnRiskExplainer:
-    """Provides fast, native TreeSHAP local and global risk factor attributions
-    supporting both Scikit-Learn pipelines and standalone native XGBoost Boosters.
+    """Provides fast risk factor attributions and predictions supporting
+    NativeTreeModel, native XGBoost Boosters, and Scikit-Learn pipelines.
     """
 
     def __init__(
@@ -43,11 +50,19 @@ class ReturnRiskExplainer:
     ):
         self.feature_names = feature_names
         self.preprocessor = preprocessor
+        self.native_model = None
+        self.booster = None
+        self.pipeline = None
+        self.classifier = None
+        self.is_native = False
+        self.is_xgboost = False
 
-        if isinstance(model, xgb.Booster):
+        if isinstance(model, NativeTreeModel):
+            self.native_model = model
+            self.is_native = True
+            logger.info("Initialized pure-Python NativeTreeModel inference engine.")
+        elif xgb is not None and isinstance(model, xgb.Booster):
             self.booster = model
-            self.pipeline = None
-            self.classifier = None
             self.is_xgboost = True
             logger.info("Initialized native XGBoost Booster TreeSHAP engine.")
         elif hasattr(model, "named_steps"):
@@ -55,7 +70,7 @@ class ReturnRiskExplainer:
             if self.preprocessor is None:
                 self.preprocessor = model.named_steps["preprocessor"]
             self.classifier = model.named_steps["classifier"]
-            if hasattr(self.classifier, "get_booster"):
+            if hasattr(self.classifier, "get_booster") and xgb is not None:
                 self.booster = self.classifier.get_booster()
                 self.is_xgboost = True
                 logger.info("Initialized native XGBoost TreeSHAP engine.")
@@ -63,21 +78,22 @@ class ReturnRiskExplainer:
                 self.booster = None
                 self.is_xgboost = False
         else:
-            self.booster = model
-            self.pipeline = None
-            self.is_xgboost = True
+            self.native_model = model
+            self.is_native = True
 
     def compute_shap_values(self, X_trans: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-        """Computes TreeSHAP feature values and bias term for a transformed matrix."""
-        if self.is_xgboost and self.booster is not None:
+        """Computes feature values and bias term for a transformed matrix."""
+        if self.is_native and self.native_model is not None:
+            x_vec = X_trans[0] if len(X_trans.shape) > 1 else X_trans
+            _, contribs = self.native_model.predict_margin_and_contribs(x_vec)
+            return contribs.reshape(1, -1), np.array([self.native_model.base_margin])
+        elif self.is_xgboost and self.booster is not None and xgb is not None:
             dmat = xgb.DMatrix(X_trans)
             contribs = self.booster.predict(dmat, pred_contribs=True)
-            # Last column is base value / bias
             shap_vals = contribs[:, :-1]
             bias = contribs[:, -1]
             return shap_vals, bias
         else:
-            # Fallback for non-XGBoost tree models if shap is installed
             import shap
             explainer = shap.TreeExplainer(self.classifier)
             shap_vals = explainer.shap_values(X_trans)
@@ -91,25 +107,29 @@ class ReturnRiskExplainer:
         top_k: int = 3,
     ) -> Dict[str, Any]:
         """Explains a single transaction input (dict or DataFrame)."""
-        # Transform through preprocessor
         if hasattr(self.preprocessor, "transform_dict") and isinstance(raw_row, dict):
             X_trans = self.preprocessor.transform_dict(raw_row)
         elif hasattr(self.preprocessor, "transform"):
             X_trans = self.preprocessor.transform(raw_row)
         else:
-            X_trans = np.asarray(raw_row, dtype=np.float32)
+            X_trans = np.asarray(raw_row, dtype=np.float64)
 
-        if self.booster is not None:
-            dmat = xgb.DMatrix(X_trans)
+        if self.is_native and self.native_model is not None:
+            x_vec = X_trans[0] if len(X_trans.shape) > 1 else X_trans
+            margin, contribs = self.native_model.predict_margin_and_contribs(x_vec)
+            proba = float(1.0 / (1.0 + np.exp(-margin)))
+            sv = contribs
+        elif self.booster is not None and xgb is not None:
+            dmat = xgb.DMatrix(X_trans.astype(np.float32))
             proba = float(self.booster.predict(dmat)[0])
+            shap_vals, _ = self.compute_shap_values(X_trans)
+            sv = shap_vals[0]
         else:
             proba = float(self.pipeline.predict_proba(raw_row)[0, 1])
+            shap_vals, _ = self.compute_shap_values(X_trans)
+            sv = shap_vals[0]
 
         risk_category, recommendation = classify_risk(proba)
-
-        # Compute SHAP values for single instance
-        shap_vals, _ = self.compute_shap_values(X_trans)
-        sv = shap_vals[0]
 
         # Top positive contributing features (pushing risk UP)
         top_pos_indices = np.argsort(sv)[::-1]

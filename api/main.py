@@ -19,7 +19,12 @@ try:
     import pandas as pd
 except ImportError:
     pd = None
-import xgboost as xgb
+
+try:
+    import xgboost as xgb
+except ImportError:
+    xgb = None
+
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
@@ -28,6 +33,7 @@ from pydantic import BaseModel, Field
 
 import config
 from src.feature_engineering import LightweightInferencePreprocessor
+from src.native_model import NativeTreeModel
 from src.shap_analysis import ReturnRiskExplainer
 from src.utils import classify_risk, get_logger, load_artifact
 
@@ -55,16 +61,15 @@ SAMPLE_PRODUCTS = [
 
 
 def load_model_state():
-    """Loads lightweight native booster and preprocessor into global memory."""
+    """Loads lightweight native tree model and preprocessor into global memory."""
     try:
         booster_path = PROJECT_ROOT / "models" / "best_model_booster.json"
         preprocessor_path = PROJECT_ROOT / "models" / "inference_preprocessor.json"
         threshold_path = PROJECT_ROOT / "models" / "threshold.json"
 
-        # Preferred lightweight path (no sklearn, no scipy, no pandas required)
+        # Preferred ultra-lightweight path (zero xgboost, scipy, sklearn, pandas required)
         if booster_path.exists() and preprocessor_path.exists():
-            booster = xgb.Booster()
-            booster.load_model(str(booster_path))
+            native_model = NativeTreeModel(booster_path)
             preprocessor = LightweightInferencePreprocessor(preprocessor_path)
 
             with open(preprocessor_path, "r", encoding="utf-8") as f:
@@ -77,16 +82,16 @@ def load_model_state():
             else:
                 threshold_config = {"optimal_threshold": 0.19, "threshold": 0.19, "fp_cost": 5.0, "fn_cost": 25.0}
 
-            app_state["booster"] = booster
+            app_state["native_model"] = native_model
             app_state["preprocessor"] = preprocessor
             app_state["threshold_config"] = threshold_config
             app_state["explainer"] = ReturnRiskExplainer(
-                model=booster,
+                model=native_model,
                 feature_names=feature_names,
                 preprocessor=preprocessor,
             )
-            app_state["pipeline"] = booster  # Backwards-compatible flag
-            logger.info("Lightweight XGBoost booster and native preprocessor loaded successfully.")
+            app_state["pipeline"] = native_model  # Backwards-compatible flag
+            logger.info("Pure-Python NativeTreeModel and preprocessor loaded successfully.")
         else:
             # Fallback to standard pipeline if available
             pipeline = load_artifact(config.MODEL_PATH)
@@ -105,7 +110,7 @@ def load_model_state():
     except Exception as e:
         logger.error(f"Error during model loading: {e}")
         app_state["pipeline"] = None
-        app_state["booster"] = None
+        app_state["native_model"] = None
 
 
 # Load immediately on module load
