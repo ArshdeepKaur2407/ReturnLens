@@ -1,44 +1,35 @@
 # ReturnLens — Business Impact & Cost-Sensitive Decision Report
 
 **Project**: ReturnLens (AI Risk Manager — E-Commerce Return Risk Prediction)  
-**Status**: Stage 6 Deliverable  
-**Disclaimer**: *All financial numbers ($) in this report are based on explicit PLACEHOLDER BUSINESS ASSUMPTIONS (FP Cost: $5.00, FN Cost: $25.00). This is a proof-of-concept prototype and does not represent real Razorpay or partner merchant proprietary financial data or policy.*
+**Evaluation Set**: Held-Out Test Sample ($N = 50,000$ transactions)  
+**Cost Model**: $\text{Total Cost} = (FP \times \$5.00) + (FN \times \$25.00)$  
+
+> ⚠️ **Disclaimer & Scientific Note**: *The financial figures below (\$5.00 FP friction cost and \$25.00 FN return fulfillment cost) are explicit **illustrative assumptions** for academic demonstration. Estimated savings are **model-based counterfactual estimates**; determining true business savings in a live production environment requires randomized A/B intervention testing.*
 
 ---
 
-## 1. Executive Summary & Calibration Assessment
+## 1. Operating Policy Comparison (Held-Out Test Sample)
 
-* **Probability Calibration (Brier Score)**: `0.1227` (Close to 0 indicates well-calibrated probabilities).
-* **Optimal Cost-Sensitive Threshold**: `0.19` (Determined strictly via minimum cost sweep on Validation data).
-* **Held-Out Test Sample Evaluated**: `150,000` orders.
-
----
-
-## 2. Business Impact & ROI Comparison (Held-Out Test Set)
-
-| Policy Metric | Baseline (Unmanaged / Zero Flagging) | ReturnLens AI Risk Manager | Absolute Impact / Delta |
-| :--- | :--- | :--- | :--- |
-| **Decision Threshold** | None (Default Accept All) | **`0.19`** | Tuned for minimum financial loss |
-| **Flagged High-Risk Orders** | `0 (0.0%)` | **`106,704 (71.14%)`** | Targeted risk intervention |
-| **Correctly Intercepted Returns (TP)** | `0` | **`85,096`** | Pre-empted return logistics |
-| **Unnecessary Friction on Kept Orders (FP)** | `0` | **`21,608`** | Controlled customer friction |
-| **Unmanaged Returns Incurred (FN)** | `86,348` | **`1,252`** | **`85,096` avoided return losses** |
-| **Total Operational Loss / Cost ($)** | **`$2,158,700.00`** | **`$139,340.00`** | **`$2,019,360.00 Estimated Savings`** |
-| **Cost Reduction Ratio** | Baseline (100%) | **`6.45%`** | **`93.55% Net Loss Reduction`** |
+| Metric | Unmanaged Baseline (No Intervention) | Standard Cutoff (τ = 0.50) | Cost-Optimal Cutoff (τ = 0.17) |
+| :--- | :---: | :---: | :---: |
+| **Operating Threshold (τ)** | None (Accept All) | 0.50 | **0.17** |
+| **Flagged Orders** | 0 (0.00%) | 29,096 (58.19%) | **44,565 (89.13%)** |
+| **Intercepted Returns (TP)** | 0 | 21,647 (78.47% recall) | **27,102 (98.25% recall)** |
+| **Customer Friction Triggers (FP)** | 0 | 7,449 (14.90%) | **17,463 (34.93%)** |
+| **Unmanaged Returns (FN)** | 27,585 | 5,938 | **483** |
+| **Illustrative Total Cost ($)** | **$689,625.00** | **$185,695.00** | **$99,390.00** |
+| **Estimated Model Savings ($)** | \$0.00 (Baseline) | **$503,930.00 (73.1%)** | **$590,235.00 (85.6%)** |
 
 ---
 
-## 3. Predicted Probability vs. Observed Return Rate (Validation Data)
+## 2. Interpretation of the Cost Curve
 
-| Predicted Probability Range | Mean Predicted Probability | Observed Empirical Return Rate | Order Sample Count |
-| :--- | :--- | :--- | :--- |
-| 0.00 - 0.10 | 0.0428 | 0.0421 | 8,392 |
-| 0.10 - 0.20 | 0.1424 | 0.1454 | 3,198 |
-| 0.20 - 0.30 | 0.2468 | 0.2512 | 2,170 |
-| 0.30 - 0.40 | 0.3500 | 0.3616 | 2,110 |
-| 0.40 - 0.50 | 0.4533 | 0.4571 | 2,446 |
-| 0.50 - 0.60 | 0.5520 | 0.5464 | 7,960 |
-| 0.60 - 0.70 | 0.6506 | 0.6553 | 2,411 |
-| 0.70 - 0.80 | 0.7512 | 0.7516 | 2,886 |
-| 0.80 - 0.90 | 0.8562 | 0.8541 | 3,345 |
-| 0.90 - 1.00 | 0.9690 | 0.9686 | 15,082 |
+1. **Asymmetric Penalty Dynamics**:
+   - In e-commerce return risk, a False Negative carries reverse-shipping, packaging, and restocking losses (assumed at \$25.00).
+   - A False Positive triggers a mild verification prompt (e.g. size confirmation, return policy reminder), assumed to cost \$5.00 in friction or retention impact.
+2. **Why τ* is Lower Than 0.50**:
+   - The theoretical Bayes risk cutoff for this cost ratio is $\tau^* = \frac530 \approx 0.167$.
+   - The empirical sweep on validation data selects **0.17**, aligning closely with theoretical expectations.
+3. **Operational Trade-Off**:
+   - At $\tau = 0.50$, the system balances accuracy (73.2%) and flags 58.2% of orders.
+   - At $\tau = 0.17$, the system prioritizes intercepting 98.2% of returns, cutting unmanaged return leakage to just 483 orders.

@@ -38,9 +38,9 @@ We evaluate the dataset against four distinct vectors of data leakage:
 | `shippingCountry` | `object` | None (Geographic) | Categorical country identifier (`Country_A` through `Country_I`). | **Keep** | One-Hot Encoded with `handle_unknown='ignore'`. |
 | `Country_A` .. `Country_I` | `int64` | None (Pre-encoded) | Pre-computed binary indicators for country. | **Drop / Redundant** | Rely on `shippingCountry` categorical column with standard Scikit-Learn `OneHotEncoder` to avoid multicollinearity. |
 | `premier` | `int64` | None (Subscription) | VIP / subscription membership status at time of profile capture. | **Keep** | Binary numeric feature; imputed with 0 for cold-start customers. |
-| `salesPerCustomer` | `int64` | Low (Historical Aggregate) | Total lifetime purchase count prior to snapshot. Audit confirmed total exceeds sampled event counts (`salesPerCustomer >= ev_sales` in 99.8%+ cases). | **Keep as Historical Feature** | Median imputation for new customers; standard scaling. |
-| `returnsPerCustomer` | `int64` | Low (Historical Aggregate) | Total lifetime return count prior to snapshot. | **Keep as Historical Feature** | Median imputation for new customers; standard scaling. |
-| `customerReturnRate` | `float64` | Medium (Aggregate Rate) | Historical return ratio (`returnsPerCustomer / salesPerCustomer`). Reflects prior baseline customer propensity, not current order outcome. | **Keep as Historical Feature** | Median imputation for cold-start customers; scaled. |
+| `salesPerCustomer` | `int64` | Low-Medium (Snapshot Aggregate) | Total lifetime purchase count recorded in customer snapshot. In the benchmark dataset, transactions lack timestamps, creating observational uncertainty about whether the snapshot includes the current transaction. In production, this must strictly be calculated point-in-time prior to checkout. | **Keep as Available Feature** | Median imputation for cold-start customers; standard scaling fit strictly on $X_{\text{train}}$. |
+| `returnsPerCustomer` | `int64` | Low-Medium (Snapshot Aggregate) | Total lifetime return count in snapshot. Carries the same snapshot window uncertainty as sales count. | **Keep as Available Feature** | Median imputation for cold-start customers; standard scaling fit strictly on $X_{\text{train}}$. |
+| `customerReturnRate` | `float64` | Medium (Snapshot Ratio) | Historical return ratio (`returnsPerCustomer / salesPerCustomer`). Empirical correlation with target is ~0.495 (strong predictive signal, but far from 1.0; 43.5% of test customers have no history). | **Keep as Historical Feature** | Median imputation for cold-start customers; scaled strictly using training statistics. |
 | `customerId_level_return_code_A` .. `L` | `float64` | Low (Historical Proportions) | Proportions of historical returns attributed to reasons A through L. Sums to $\le 1.0$. | **Keep** | Renamed uniquely (`_D1`, `_D2` to fix duplicate column headers in raw data); 0-imputation for cold-start customers. |
 
 ---
@@ -112,14 +112,16 @@ Total Transaction Events: 2,829,499 rows
      └── Completely untouched until Stage 5 (single final evaluation pass).
 ```
 
-### B. Summary of Split Row Counts & Class Balance
+### B. Summary of Evaluated Split Row Counts & Class Balance
 
-| Split Partition | Row Count | % of Total Events | Class 0 (Kept) | Class 1 (Returned) | Return Rate (%) | Split Purpose |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Train Set ($X_{\text{train}}, y_{\text{train}}$)** | **1,584,519** | 56.00% | 715,413 | 869,106 | 54.85% | Preprocessor fitting & model training |
-| **Validation Set ($X_{\text{val}}, y_{\text{val}}$)** | **396,130** | 14.00% | 178,853 | 217,277 | 54.85% | Model selection, calibration & threshold search |
-| **Held-Out Test Set ($X_{\text{test}}, y_{\text{test}}$)** | **848,850** | 30.00% | 382,640 | 466,210 | 54.92% | Final unbiased validation pass (once only) |
-| **Total Event Population** | **2,829,499** | 100.00% | 1,276,906 | 1,552,593 | 54.87% | Full dataset population |
+To ensure practical execution times on local development machines while maintaining rigorous statistical power, we use a reproducible stratified sampling protocol (`random_state = 42`):
+
+| Split Partition | Sample Count | % of Sample | Class 0 (Kept) | Class 1 (Returned) | Return Rate (%) | Split Purpose |
+| :--- | :---: | :---: | :---: | :---: | :---: | :--- |
+| **Train Set ($X_{\text{train}}, y_{\text{train}}$)** | **80,000** | 53.33% | 36,000 | 44,000 | 55.00% | Preprocessor fitting strictly on training split; model parameter optimization |
+| **Validation Set ($X_{\text{val}}, y_{\text{val}}$)** | **20,000** | 13.33% | 9,000 | 11,000 | 55.00% | Model selection, probability calibration check & cost threshold search |
+| **Held-Out Test Set ($X_{\text{test}}, y_{\text{test}}$)** | **50,000** | 33.34% | 22,415 | 27,585 | 55.17% | Single-pass unbiased evaluation on held-out partition (`event_table_testing_raw.p`) |
+| **Total Evaluated Events** | **150,000** | 100.00% | 67,415 | 82,585 | 55.06% | Representative stratified experimental cohort |
 
 ---
 

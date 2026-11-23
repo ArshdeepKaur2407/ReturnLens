@@ -4,7 +4,16 @@ per-prediction local factor attributions for individual transactions.
 """
 from __future__ import annotations
 import json
+import sys
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
+
+# Ensure project root is on sys.path
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+import config
 
 try:
     import matplotlib.pyplot as plt
@@ -171,36 +180,45 @@ class ReturnRiskExplainer:
 
     def _make_human_readable(self, feat_name: str, raw_row: Any) -> str:
         """Translates internal feature names into plain-English risk driver descriptions."""
+        sales = self._get_val(raw_row, "salesPerCustomer", None)
         if "customerReturnRate" in feat_name:
+            if sales is None or float(sales) == 0:
+                return "Cold-Start Customer (No prior order history; baseline population return propensity applied)"
             val = self._get_val(raw_row, "customerReturnRate", None)
             if val is None:
-                return "Cold-Start Customer (Baseline Population Return Propensity)"
-            return f"High Customer Historical Return Rate ({float(val)*100:.1f}%)"
+                return "Cold-Start Customer (Baseline population return propensity applied)"
+            return f"Customer Historical Return Rate ({float(val)*100:.1f}%)"
+        elif "returnsPerCustomer" in feat_name:
+            if sales is None or float(sales) == 0:
+                return "Cold-Start Customer (No previous return events on file)"
+            val = self._get_val(raw_row, "returnsPerCustomer", 0)
+            return f"Past Returns by Customer ({int(val)} total returns across {int(sales)} orders)"
         elif "productReturnRate" in feat_name:
             val = self._get_val(raw_row, "productReturnRate", None)
             if val is None:
-                return "Cold-Start Product Category (Baseline Return Propensity)"
-            return f"Elevated Product Category Return Rate ({float(val)*100:.1f}%)"
-        elif "returnsPerCustomer" in feat_name:
-            val = self._get_val(raw_row, "returnsPerCustomer", 0)
-            return f"Frequent Past Returns by Customer ({int(val)} total returns)"
+                return "Cold-Start Product Variant (Catalog baseline return propensity applied)"
+            return f"Product Category / Variant Return Rate ({float(val)*100:.1f}%)"
+        elif "salesPerCustomer" in feat_name:
+            if sales is None or float(sales) == 0:
+                return "Limited Customer Order History (Cold-Start)"
+            return f"Customer Order Frequency ({int(sales)} lifetime orders)"
         elif "avgGbpPrice" in feat_name:
             val = self._get_val(raw_row, "avgGbpPrice", 25.0)
-            return f"High Item Value (£{float(val):.2f})"
+            return f"Item Price Level (£{float(val):.2f})"
         elif "avgDiscountValue" in feat_name or "discount_ratio" in feat_name:
-            return "Heavy Discount Arbitrage Risk"
+            return "Item Promotional Discount Depth"
         elif "customer_age" in feat_name or "yearOfBirth" in feat_name:
             return "Customer Demographic Age Band"
         elif "return_code" in feat_name:
-            return "Specific Historical Return Reason Pattern"
+            return "Historical Return Reason Pattern (Fit / Sizing / Style)"
         elif "premier" in feat_name:
-            return "VIP / Subscription Member Dynamics"
+            return "VIP Loyalty Membership Status"
         elif "productType" in feat_name:
             clean_type = feat_name.replace("productType_", "").replace("cat__", "")
-            return f"High-Return Product Category ({clean_type})"
+            return f"Product Category Risk ({clean_type})"
         elif "shippingCountry" in feat_name:
             clean_country = feat_name.replace("shippingCountry_", "").replace("cat__", "")
-            return f"Shipping Country Risk Profile ({clean_country})"
+            return f"Shipping Country Destination ({clean_country})"
         elif "brandDesc" in feat_name:
             clean_brand = feat_name.replace("brandDesc_", "").replace("cat__", "")
             return f"Brand Return Tendency ({clean_brand})"

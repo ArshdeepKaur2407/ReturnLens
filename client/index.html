@@ -3,29 +3,82 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ReturnLens — Enterprise Return Risk & RTO Defense Platform</title>
-    <meta name="description" content="Calibrated e-commerce return risk prediction and cost-sensitive defense engine with TreeSHAP explainability." />
-    <!-- Tailwind CSS CDN for instant styling -->
+    <title>ReturnLens — E-Commerce Return Risk Prediction & Cost Optimization</title>
+    <meta name="description" content="Calibrated e-commerce return risk prediction and cost-sensitive decision engine with TreeSHAP factor attributions." />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
-        darkMode: 'class',
         theme: {
           extend: {
             colors: {
-              slate: {
-                950: '#060911',
-                900: '#0b1120',
-                850: '#0f172a',
-                800: '#1e293b',
-              }
+              canvas: '#fbfbfa',
+              surface: {
+                DEFAULT: '#ffffff',
+                subtle: '#f5f4f0',
+                hover: '#eeede8',
+              },
+              border: {
+                subtle: '#f0eee6',
+                DEFAULT: '#e6e4dc',
+                strong: '#d3d0c4',
+              },
+              stone: {
+                50: '#fafaf9',
+                100: '#f5f5f4',
+                200: '#e7e5e4',
+                300: '#d6d3d1',
+                400: '#a8a29e',
+                500: '#78716c',
+                600: '#57534e',
+                700: '#44403c',
+                800: '#292524',
+                900: '#1c1917',
+                950: '#0c0a09',
+              },
+              sage: {
+                50: '#f4f7f5',
+                100: '#e5ece7',
+                200: '#ccdad1',
+                300: '#a8c1b2',
+                400: '#7ea28e',
+                500: '#5c866f',
+                600: '#476b57',
+                700: '#395546',
+                800: '#2f4438',
+                900: '#283930',
+              },
+              lavender: {
+                50: '#f7f6fa',
+                100: '#eeedf5',
+                200: '#dedbe9',
+                300: '#c5c0d7',
+                400: '#a69fc0',
+                500: '#8c82ab',
+                600: '#736894',
+                700: '#5e547a',
+                800: '#4e4664',
+                900: '#433c54',
+              },
+            },
+            fontFamily: {
+              sans: ['"Plus Jakarta Sans"', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto', 'sans-serif'],
+              mono: ['"JetBrains Mono"', 'ui-monospace', 'SFMono-Regular', 'Consolas', 'monospace'],
+            },
+            boxShadow: {
+              'subtle': '0 1px 2px 0 rgba(0, 0, 0, 0.03), 0 1px 3px -1px rgba(0, 0, 0, 0.02)',
+              'card': '0 1px 3px 0 rgba(0, 0, 0, 0.04), 0 2px 6px -1px rgba(0, 0, 0, 0.03)',
+              'elevated': '0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.03)',
             }
           }
         }
       }
     </script>
   </head>
-  <body class="bg-slate-950 text-slate-100 antialiased">
+  <body class="bg-canvas text-stone-900 antialiased selection:bg-stone-200">
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

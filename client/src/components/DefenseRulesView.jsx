@@ -1,39 +1,39 @@
 import React, { useState } from 'react';
-import { CheckCircle2, Shield, ToggleLeft, ToggleRight, Plus, Trash2, ArrowRight } from 'lucide-react';
+import { ShieldCheck, Check, Info } from 'lucide-react';
 
 export default function DefenseRulesView() {
   const [rules, setRules] = useState([
     {
       id: 1,
-      name: 'Size Bracketing Prompt',
-      condition: 'Multiple sizes of same product variant in cart',
-      action: 'Render interactive 3D sizing advisor before checkout',
+      name: 'Size Bracketing Advisory',
+      condition: 'P(Return) >= 55% or Multiple sizes of same SKU in cart',
+      action: 'Render interactive sizing fit advisor before order confirmation',
       riskTier: 'HIGH',
       active: true,
     },
     {
       id: 2,
       name: 'Prepaid Verification Requirement',
-      condition: 'P(Return) >= 80% & Cart Value > £50',
-      action: 'Disable Cash-on-Delivery (COD); require instant UPI/Card verification',
+      condition: 'P(Return) >= 80% and Cart Value > £50',
+      action: 'Disable Cash-on-Delivery (COD); prompt instant prepaid confirmation',
       riskTier: 'VERY_HIGH',
       active: true,
     },
     {
       id: 3,
-      name: 'Loyalty VIP Return Pass',
-      condition: 'Customer is VIP Premier & Lifetime Orders > 20',
-      action: 'Bypass friction check and provide complimentary return pickup',
+      name: 'VIP Return Waiver',
+      condition: 'Customer is VIP Premier and Lifetime Orders > 20',
+      action: 'Bypass targeted friction check and provide complimentary return processing',
       riskTier: 'LOW',
       active: true,
     },
     {
       id: 4,
       name: 'Category Return Notice',
-      condition: 'Product Type in [Dresses, Shoes] with category return rate > 45%',
-      action: 'Display clear return terms reminder on product page',
+      condition: 'Category in [Dresses, Shoes] with category return rate > 45%',
+      action: 'Display clear return terms reminder on product detail page',
       riskTier: 'MEDIUM',
-      active: false,
+      active: true,
     },
   ]);
 
@@ -43,15 +43,16 @@ export default function DefenseRulesView() {
 
   return (
     <div className="space-y-6">
-      <div className="glass-panel p-6 border-slate-800">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      {/* Overview Banner */}
+      <div className="saas-card p-5 sm:p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <div className="flex items-center space-x-2">
-              <Shield className="w-5 h-5 text-purple-400" />
-              <h2 className="text-lg font-bold text-white">Merchant Defense Policy Engine</h2>
+              <ShieldCheck className="w-4 h-4 text-stone-700" />
+              <h2 className="text-sm font-semibold text-stone-900">Pre-Fulfillment Intervention Policies</h2>
             </div>
-            <p className="text-xs text-slate-400 mt-1">
-              Configure non-blocking defensive interventions triggered automatically by ReturnLens risk scores.
+            <p className="text-xs text-stone-500 mt-1 max-w-2xl">
+              Configure non-blocking defensive checks triggered when return-risk scores exceed defined operational thresholds.
             </p>
           </div>
         </div>
@@ -62,43 +63,51 @@ export default function DefenseRulesView() {
         {rules.map((rule) => (
           <div
             key={rule.id}
-            className={`glass-panel p-5 border transition flex flex-col md:flex-row md:items-center justify-between gap-4 ${
-              rule.active ? 'border-slate-800 bg-slate-900/60' : 'border-slate-900 bg-slate-950/40 opacity-60'
+            className={`saas-card p-5 transition-all flex flex-col md:flex-row md:items-center justify-between gap-4 ${
+              rule.active ? 'bg-white' : 'bg-surface-subtle opacity-75'
             }`}
           >
-            <div className="space-y-1.5 flex-1">
+            <div className="space-y-2 flex-1">
               <div className="flex items-center space-x-2.5">
-                <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold uppercase ${
-                  rule.riskTier === 'VERY_HIGH'
-                    ? 'badge-very_high'
-                    : rule.riskTier === 'HIGH'
-                    ? 'badge-high'
-                    : rule.riskTier === 'MEDIUM'
-                    ? 'badge-medium'
-                    : 'badge-low'
-                }`}>
-                  {rule.riskTier}
+                <span
+                  className={`px-2 py-0.5 rounded text-[10px] font-semibold tracking-wide ${
+                    rule.riskTier === 'VERY_HIGH'
+                      ? 'badge-very_high'
+                      : rule.riskTier === 'HIGH'
+                      ? 'badge-high'
+                      : rule.riskTier === 'MEDIUM'
+                      ? 'badge-medium'
+                      : 'badge-low'
+                  }`}
+                >
+                  {rule.riskTier} TIER
                 </span>
-                <h3 className="text-sm font-bold text-white">{rule.name}</h3>
+                <h3 className="text-xs font-semibold text-stone-900">{rule.name}</h3>
               </div>
-              <div className="text-xs text-slate-300">
-                <span className="text-slate-400">Condition:</span> <code className="text-cyan-300 bg-slate-950 px-1.5 py-0.5 rounded border border-slate-800">{rule.condition}</code>
+
+              <div className="text-xs text-stone-600">
+                <span className="text-stone-400 font-medium">Trigger:</span>{' '}
+                <code className="text-stone-800 bg-stone-100 px-1.5 py-0.5 rounded font-mono text-[11px] border border-stone-200">
+                  {rule.condition}
+                </code>
               </div>
-              <div className="text-xs text-slate-300">
-                <span className="text-slate-400">Action:</span> {rule.action}
+
+              <div className="text-xs text-stone-600">
+                <span className="text-stone-400 font-medium">Action:</span> {rule.action}
               </div>
             </div>
 
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-3 self-start md:self-center">
               <button
+                type="button"
                 onClick={() => toggleRule(rule.id)}
-                className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition ${
+                className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
                   rule.active
-                    ? 'bg-emerald-950/80 text-emerald-300 border-emerald-800'
-                    : 'bg-slate-900 text-slate-400 border-slate-800'
+                    ? 'bg-stone-900 text-white border-stone-900 shadow-xs'
+                    : 'bg-white text-stone-600 border-border hover:bg-stone-50'
                 }`}
               >
-                {rule.active ? <CheckCircle2 className="w-3.5 h-3.5" /> : null}
+                {rule.active && <Check className="w-3.5 h-3.5 text-stone-300" />}
                 <span>{rule.active ? 'Active Policy' : 'Disabled'}</span>
               </button>
             </div>

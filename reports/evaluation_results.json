@@ -1,0 +1,117 @@
+{
+  "dataset_verification": {
+    "dataset_name": "ASOS E-Commerce Returns Dataset (Predicting Returns in Fashion E-Commerce)",
+    "label_status": "Verified un-enhanced original raw labels from event_table_*_raw.p",
+    "earlier_experiments_note": "Earlier experiments generated synthetic labels to target ~82% accuracy; current pipeline uses verified raw labels directly.",
+    "raw_train_events_total": 1980649,
+    "raw_test_events_total": 848850,
+    "target_variable": "isReturned (1 = Returned, 0 = Kept)",
+    "positive_class": 1,
+    "sample_seed": 42,
+    "evaluated_sample_sizes": {
+      "train_events": 80000,
+      "validation_events": 20000,
+      "held_out_test_events": 50000
+    }
+  },
+  "cost_model_assumptions": {
+    "fp_cost": 5.0,
+    "fn_cost": 25.0,
+    "formula": "Cost = FP * fp_cost + FN * fn_cost",
+    "assumption_note": "$5 FP (customer friction / verification) and $25 FN (reverse logistics, shipping, restock) are illustrative assumptions for educational demonstration. Real business impact requires randomized A/B intervention testing."
+  },
+  "validation_benchmarks": [
+    {
+      "model_name": "XGBoost",
+      "pr_auc": 0.8073,
+      "roc_auc": 0.7762,
+      "f1": 0.749,
+      "precision": 0.6973,
+      "recall": 0.809,
+      "accuracy": 0.7018,
+      "brier_score": 0.1898,
+      "train_time_sec": 3.79
+    },
+    {
+      "model_name": "Logistic Regression",
+      "pr_auc": 0.804,
+      "roc_auc": 0.7742,
+      "f1": 0.7461,
+      "precision": 0.7002,
+      "recall": 0.7985,
+      "accuracy": 0.7012,
+      "brier_score": 0.1909,
+      "train_time_sec": 0.95
+    },
+    {
+      "model_name": "Baseline (Prior)",
+      "pr_auc": 0.55,
+      "roc_auc": 0.5,
+      "f1": 0.7097,
+      "precision": 0.55,
+      "recall": 1.0,
+      "accuracy": 0.55,
+      "brier_score": 0.2475,
+      "train_time_sec": 0.0
+    }
+  ],
+  "threshold_selection": {
+    "selection_split": "validation (N=20,000)",
+    "selected_optimal_threshold": 0.17,
+    "selection_criterion": "Minimum total illustrative cost on validation set",
+    "validation_brier_score": 0.1898
+  },
+  "held_out_test_evaluation": {
+    "sample_size": 50000,
+    "actual_positives": 27585,
+    "actual_negatives": 22415,
+    "return_rate_percent": 55.17,
+    "selected_model": "XGBoost",
+    "at_0_50_threshold": {
+      "threshold": 0.5,
+      "accuracy": 0.7323,
+      "precision": 0.744,
+      "recall": 0.7847,
+      "f1": 0.7638,
+      "roc_auc": 0.8119,
+      "pr_auc": 0.8418,
+      "brier_score": 0.1754,
+      "confusion_matrix": {
+        "TN": 14966,
+        "FP": 7449,
+        "FN": 5938,
+        "TP": 21647
+      },
+      "cost_analysis": {
+        "baseline_cost": 689625.0,
+        "incurred_cost": 185695.0,
+        "estimated_savings": 503930.0,
+        "savings_percent": 73.07,
+        "flag_rate": 0.5819
+      }
+    },
+    "at_validation_selected_threshold": {
+      "threshold": 0.17,
+      "accuracy": 0.6411,
+      "precision": 0.6081,
+      "recall": 0.9825,
+      "f1": 0.7513,
+      "roc_auc": 0.8119,
+      "pr_auc": 0.8418,
+      "brier_score": 0.1754,
+      "confusion_matrix": {
+        "TN": 4952,
+        "FP": 17463,
+        "FN": 483,
+        "TP": 27102
+      },
+      "cost_analysis": {
+        "baseline_cost": 689625.0,
+        "incurred_cost": 99390.0,
+        "estimated_savings": 590235.0,
+        "savings_percent": 85.59,
+        "flag_rate": 0.8913
+      }
+    }
+  }
+}

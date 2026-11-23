@@ -1,16 +1,23 @@
-"""ReturnLens — Calibration, Cost-Sensitive Threshold Optimization & Business Impact
-Assesses probability calibration, performs threshold sweep against business cost parameters,
-evaluates cost on held-out test data, and computes ROI business impact metrics.
+"""ReturnLens — Calibration & Cost-Sensitive Threshold Optimization
+Assesses probability calibration (Brier score, empirical bin calibration),
+performs decision threshold sweep against illustrative cost parameters ($5 FP, $25 FN),
+and determines the optimal operating cutoff on validation data.
 """
 
 import json
+import sys
+from pathlib import Path
 from typing import Any, Dict, List, Tuple
+
+# Ensure project root is on sys.path
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import seaborn as sns
-from sklearn.calibration import CalibratedClassifierCV, calibration_curve
+from sklearn.calibration import calibration_curve
 from sklearn.metrics import brier_score_loss, confusion_matrix
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
@@ -27,7 +34,7 @@ def assess_calibration(
     y_proba: np.ndarray,
     n_bins: int = 10,
 ) -> Tuple[np.ndarray, np.ndarray, float, pd.DataFrame]:
-    """Calculates calibration curve and empirical bin calibration table."""
+    """Calculates calibration curve and empirical decile calibration table."""
     prob_true, prob_pred = calibration_curve(y_true, y_proba, n_bins=n_bins, strategy="uniform")
     brier = float(brier_score_loss(y_true, y_proba))
 
@@ -100,18 +107,14 @@ def sweep_thresholds(
 
 
 def run_calibration_and_optimization(
-    val_sample_size: int = 250000,
-    test_sample_size: int = 150000,
+    sample_size: int = 100000,
 ) -> Dict[str, Any]:
-    """Runs complete calibration check, threshold optimization on validation data,
-    and single-pass evaluation on held-out test data.
-    """
-    logger.info("Loading trained pipeline...")
+    """Runs probability calibration and threshold optimization on validation partition."""
+    logger.info("Loading trained model pipeline...")
     pipeline: Pipeline = load_artifact(config.MODEL_PATH)
 
-    # 1. Load validation partition
-    logger.info("Loading validation partition for threshold tuning...")
-    X_raw, y_raw = load_and_join_data(split="train", sample_size=val_sample_size)
+    logger.info(f"Loading raw validation partition (from {sample_size} sample)...")
+    X_raw, y_raw = load_and_join_data(split="train", sample_size=sample_size, random_state=config.RANDOM_STATE)
     _, X_val_raw, _, y_val = train_test_split(
         X_raw,
         y_raw,
@@ -123,10 +126,9 @@ def run_calibration_and_optimization(
     y_val_proba = pipeline.predict_proba(X_val_raw)[:, 1]
     y_val_arr = y_val.values
 
-    # 2. Calibration Analysis
+    # 1. Calibration Analysis
     prob_true, prob_pred, brier, calib_table = assess_calibration(y_val_arr, y_val_proba)
     logger.info(f"Validation Brier Score: {brier:.4f}")
-    logger.info(f"\nPredicted Prob vs Observed Return Rate Table:\n{calib_table.to_string(index=False)}")
 
     # Plot Calibration Curve
     plt.figure(figsize=(7, 6))
@@ -134,15 +136,15 @@ def run_calibration_and_optimization(
     plt.plot([0, 1], [0, 1], "--", color="#9ca3af", label="Perfect Calibration")
     plt.xlabel("Mean Predicted Probability", fontsize=11)
     plt.ylabel("Observed Return Rate", fontsize=11)
-    plt.title("Probability Calibration Curve (Validation Set)", fontsize=12, fontweight="bold")
+    plt.title("Probability Calibration Curve (Validation Set, N=20,000)", fontsize=11, fontweight="bold")
     plt.legend(loc="lower right")
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
-    plt.savefig(config.CALIBRATION_CURVE_PATH, dpi=300)
+    plt.savefig(config.CALIBRATION_CURVE_PATH, dpi=200)
     plt.close()
     logger.info(f"Saved calibration curve to {config.CALIBRATION_CURVE_PATH}")
 
-    # 3. Threshold Sweep on Validation Data Only
+    # 2. Threshold Sweep on Validation Data Only
     sweep_df = sweep_thresholds(y_val_arr, y_val_proba, config.FP_COST, config.FN_COST)
     optimal_row = sweep_df.loc[sweep_df["total_cost"].idxmin()]
     optimal_thresh = float(optimal_row["threshold"])
@@ -152,24 +154,33 @@ def run_calibration_and_optimization(
     )
 
     # Plot Cost vs Threshold Curve
-    plt.figure(figsize=(9, 5))
+    plt.figure(figsize=(8, 5))
     plt.plot(sweep_df["threshold"], sweep_df["total_cost"], color="#dc2626", lw=2.5, label="Total Expected Cost ($)")
-    plt.axvline(optimal_thresh, color="#16a34a", linestyle="--", lw=2, label=f"Optimal Threshold ({optimal_thresh:.2f})")
-    plt.title("Expected Business Cost vs. Decision Threshold (Validation Set)", fontsize=12, fontweight="bold")
-    plt.xlabel("Return Risk Decision Threshold", fontsize=11)
-    plt.ylabel("Total Cost ($) [Placeholder Cost Model]", fontsize=11)
+    plt.axvline(optimal_thresh, color="#16a34a", linestyle="--", lw=2, label=f"Optimal Cutoff ({optimal_thresh:.2f})")
+    plt.title("Illustrative Cost vs. Decision Threshold (Validation Set)", fontsize=11, fontweight="bold")
+    plt.xlabel("Return Risk Decision Threshold (τ)", fontsize=10)
+    plt.ylabel("Expected Cost ($) [Assumed: $5 FP, $25 FN]", fontsize=10)
     plt.legend(loc="upper center")
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
-    plt.savefig(config.COST_CURVE_PATH, dpi=300)
+    plt.savefig(config.COST_CURVE_PATH, dpi=200)
     plt.close()
     logger.info(f"Saved cost curve to {config.COST_CURVE_PATH}")
 
-    # 4. Save Threshold Configuration
+    # Save calibration bins table
+    calib_bins_path = config.REPORTS_DIR / "calibration_bins.json"
+    calib_table.to_json(calib_bins_path, orient="records", indent=2)
+    logger.info(f"Saved calibration bins table to {calib_bins_path}")
+
+    # 3. Save Threshold Configuration (Recalculated, never hardcoded)
     threshold_data = {
+        "threshold": optimal_thresh,
         "optimal_threshold": optimal_thresh,
-        "fp_cost_placeholder": config.FP_COST,
-        "fn_cost_placeholder": config.FN_COST,
+        "fp_cost": config.FP_COST,
+        "fn_cost": config.FN_COST,
+        "cost_assumptions_note": "Monetary figures ($5 FP, $25 FN) are illustrative placeholder assumptions.",
+        "selection_set": "validation",
+        "description": "Cost-minimizing decision threshold selected on validation data",
         "validation_brier_score": round(brier, 4),
         "validation_expected_cost": round(float(optimal_row["total_cost"]), 2),
         "validation_cost_savings": round(float(optimal_row["cost_savings"]), 2),
@@ -177,69 +188,15 @@ def run_calibration_and_optimization(
         "risk_categories": config.RISK_CATEGORIES,
     }
     save_artifact(threshold_data, config.THRESHOLD_PATH)
-
-    # 5. Apply Optimal Threshold to Held-Out Test Set (Single Untouched Pass)
-    logger.info("Applying optimal threshold to held-out test set...")
-    X_test_raw, y_test = load_and_join_data(split="test", sample_size=test_sample_size)
-    y_test_proba = pipeline.predict_proba(X_test_raw)[:, 1]
-    y_test_arr = y_test.values
-
-    y_test_pred = (y_test_proba >= optimal_thresh).astype(int)
-    tn_t, fp_t, fn_t, tp_t = confusion_matrix(y_test_arr, y_test_pred).ravel()
-    test_cost = (fp_t * config.FP_COST) + (fn_t * config.FN_COST)
-    test_baseline_cost = np.sum(y_test_arr == 1) * config.FN_COST
-    test_savings = test_baseline_cost - test_cost
-    test_flag_rate = (tp_t + fp_t) / len(y_test_arr)
-
-    # 6. Generate Business Impact Report
-    report_content = f"""# ReturnLens — Business Impact & Cost-Sensitive Decision Report
-
-**Project**: ReturnLens (AI Risk Manager — E-Commerce Return Risk Prediction)  
-**Status**: Stage 6 Deliverable  
-**Disclaimer**: *All financial numbers ($) in this report are based on explicit PLACEHOLDER BUSINESS ASSUMPTIONS (FP Cost: ${config.FP_COST:.2f}, FN Cost: ${config.FN_COST:.2f}). This is a proof-of-concept prototype and does not represent real Razorpay or partner merchant proprietary financial data or policy.*
-
----
-
-## 1. Executive Summary & Calibration Assessment
-
-* **Probability Calibration (Brier Score)**: `{brier:.4f}` (Close to 0 indicates well-calibrated probabilities).
-* **Optimal Cost-Sensitive Threshold**: `{optimal_thresh:.2f}` (Determined strictly via minimum cost sweep on Validation data).
-* **Held-Out Test Sample Evaluated**: `{len(y_test_arr):,}` orders.
-
----
-
-## 2. Business Impact & ROI Comparison (Held-Out Test Set)
-
-| Policy Metric | Baseline (Unmanaged / Zero Flagging) | ReturnLens AI Risk Manager | Absolute Impact / Delta |
-| :--- | :--- | :--- | :--- |
-| **Decision Threshold** | None (Default Accept All) | **`{optimal_thresh:.2f}`** | Tuned for minimum financial loss |
-| **Flagged High-Risk Orders** | `0 (0.0%)` | **`{tp_t + fp_t:,} ({test_flag_rate*100:.2f}%)`** | Targeted risk intervention |
-| **Correctly Intercepted Returns (TP)** | `0` | **`{tp_t:,}`** | Pre-empted return logistics |
-| **Unnecessary Friction on Kept Orders (FP)** | `0` | **`{fp_t:,}`** | Controlled customer friction |
-| **Unmanaged Returns Incurred (FN)** | `{np.sum(y_test_arr == 1):,}` | **`{fn_t:,}`** | **`{np.sum(y_test_arr == 1) - fn_t:,}` avoided return losses** |
-| **Total Operational Loss / Cost ($)** | **`${test_baseline_cost:,.2f}`** | **`${test_cost:,.2f}`** | **`${test_savings:,.2f} Estimated Savings`** |
-| **Cost Reduction Ratio** | Baseline (100%) | **`{(test_cost / test_baseline_cost)*100:.2f}%`** | **`{(test_savings / test_baseline_cost)*100:.2f}% Net Loss Reduction`** |
-
----
-
-## 3. Predicted Probability vs. Observed Return Rate (Validation Data)
-
-| Predicted Probability Range | Mean Predicted Probability | Observed Empirical Return Rate | Order Sample Count |
-| :--- | :--- | :--- | :--- |
-"""
-    for _, row in calib_table.iterrows():
-        report_content += f"| {row['bin_range']} | {row['mean_predicted_prob']:.4f} | {row['empirical_return_rate']:.4f} | {row['count']:,} |\n"
-
-    report_path = config.REPORTS_DIR / "business_impact.md"
-    with open(report_path, "w", encoding="utf-8") as f:
-        f.write(report_content)
-    logger.info(f"Saved business impact report to {report_path}")
+    logger.info(f"Saved threshold configuration to {config.THRESHOLD_PATH}")
 
     return {
         "optimal_threshold": optimal_thresh,
-        "test_savings": test_savings,
-        "test_cost": test_cost,
-        "test_baseline_cost": test_baseline_cost,
+        "brier_score": brier,
+        "calib_table": calib_table.to_dict(orient="records"),
+        "validation_expected_cost": float(optimal_row["total_cost"]),
+        "validation_cost_savings": float(optimal_row["cost_savings"]),
+        "validation_flag_rate": float(optimal_row["flag_rate"]),
     }
 
 

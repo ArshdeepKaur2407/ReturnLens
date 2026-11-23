@@ -1,50 +1,57 @@
 # ReturnLens — Held-Out Test Set Evaluation Report
 
-> **Evaluation Mode**: Strict Single-Pass Evaluation on Touched/Persisted Frozen Model Pipeline  
-> **Model Evaluated**: `models/best_model.joblib` (XGBoost Classifier + Scikit-Learn Preprocessor)  
-> **Evaluation Sample Size**: **150,000** transactions from `event_table_testing.p`  
-> **Zero Leakage Guarantee**: Preprocessor fitted exclusively on $X_{\text{train}}$; threshold selected strictly on validation partition.
+> **Evaluation Mode**: Strict Single-Pass Evaluation on Held-Out Test Partition (`event_table_testing_raw.p`)  
+> **Model Evaluated**: `models/best_model.joblib` (XGBoost Classifier + Scikit-Learn ColumnTransformer)  
+> **Evaluated Test Sample Size**: **50,000** transactions (Seed: 42)  
+> **Target Class**: Positive = 1 (Returned: 27,585 orders, 55.17%), Negative = 0 (Kept: 22,415 orders, 44.83%)  
+> **Zero Leakage Guarantee**: Preprocessor fitted exclusively on $X_{\text{train}}$; threshold selected strictly on validation split.
 
 ---
 
 ## 1. Primary Classification & Discrimination Metrics
 
-| Metric | Measured Score | Evaluation Standard |
-| :--- | :---: | :--- |
-| **ROC-AUC** | **0.9683** | Area under Receiver Operating Characteristic curve |
-| **PR-AUC (Precision-Recall)** | **0.9775** | Risk-priority metric under severe positive class focus |
-| **Accuracy** | **89.67%** | Overall fraction of correct predictions |
-| **Precision (Positive Predictive Value)** | **90.21%** | Fraction of flagged returns that were true returns |
-| **Recall (Sensitivity / True Positive Rate)** | **92.04%** | Fraction of true return events successfully intercepted |
-| **F1-Score (Harmonic Mean)** | **0.9111** | Balanced precision/recall synthesis |
-| **Brier Score** | **0.0717** | Probability calibration accuracy (0.0 = perfect) |
+| Evaluation Metric | Standard Threshold (τ = 0.50) | Validation-Selected Threshold (τ = 0.17) | Metric Description |
+| :--- | :---: | :---: | :--- |
+| **ROC-AUC** | **0.8119** | **0.8119** | Area under ROC Curve (discrimination power) |
+| **PR-AUC** | **0.8418** | **0.8418** | Area under Precision-Recall Curve (positive class focus) |
+| **Accuracy** | **73.23%** | **64.11%** | Overall fraction of correct predictions |
+| **Precision** | **74.40%** | **60.81%** | True returns among all flagged orders |
+| **Recall (Sensitivity)** | **78.47%** | **98.25%** | Fraction of actual returns successfully detected |
+| **F1-Score** | **0.7638** | **0.7513** | Harmonic mean of Precision and Recall |
+| **Brier Score** | **0.1754** | **0.1754** | Mean squared probability error (0.0 = perfect calibration) |
 
 ---
 
-## 2. Confusion Matrix Breakdown
+## 2. Confusion Matrices & Operating Points
 
-At the standard $P \ge 0.50$ classification decision:
+### A. At Standard Cutoff (τ = 0.50)
+* **True Negatives (TN)**: **14,966** (29.9%) — Kept orders cleared without friction.
+* **True Positives (TP)**: **21,647** (43.3%) — Returns detected for targeted intervention.
+* **False Positives (FP)**: **7,449** (14.9%) — Non-returned orders flagged unnecessarily.
+* **False Negatives (FN)**: **5,938** (11.9%) — Missed returns incurring full fulfillment loss.
+* **Flag Rate**: **58.19%**
 
-```
-                      PREDICTED KEPT (0)       PREDICTED RETURNED (1)
-ACTUAL KEPT (0)         TN = 55,023              FP = 8,629
-ACTUAL RETURNED (1)     FN = 6,873              TP = 79,475
-```
-
-* **True Negatives (TN)**: **55,023** (36.68%) Kept orders processed with zero customer friction.
-* **True Positives (TP)**: **79,475** (52.98%) High-risk returns correctly detected and flagged for merchant intervention.
-* **False Positives (FP)**: **8,629** (5.75%) Low-friction verification prompt triggers.
-* **False Negatives (FN)**: **6,873** (4.58%) Missed returns incurring fulfillment loss.
+### B. At Cost-Optimal Cutoff (τ = 0.17)
+* **True Negatives (TN)**: **4,952** (9.9%)
+* **True Positives (TP)**: **27,102** (54.2%)
+* **False Positives (FP)**: **17,463** (34.9%)
+* **False Negatives (FN)**: **483** (1.0%)
+* **Flag Rate**: **89.13%**
 
 ---
 
-## 3. Validation vs Held-Out Test Generalization Comparison
+## 3. Candidate Model Comparison on Validation Partition (N=20,000)
 
-| Evaluation Metric | 20% Validation Split ($N=50,000$) | Held-Out Test Set ($N=150,000$) | Generalization Gap |
-| :--- | :---: | :---: | :---: |
-| **PR-AUC** | 0.9266 | **0.9775** | +0.0509 (Robust generalization) |
-| **ROC-AUC** | 0.9048 | **0.9683** | +0.0635 (No overfitting) |
-| **Accuracy** | 81.27% | **89.67%** | +8.40% |
-| **Recall** | 88.74% | **92.04%** | +3.30% |
-| **Precision** | 80.68% | **90.21%** | +9.53% |
-| **Brier Score** | 0.1227 | **0.0717** | Well-calibrated |
+| Model Name | PR-AUC | ROC-AUC | Accuracy | Precision | Recall | F1-Score | Brier Score | Fit Time |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **XGBoost** | 0.8073 | 0.7762 | 70.18% | 69.73% | 80.90% | 0.7490 | 0.1898 | 3.79s |
+| **Logistic Regression** | 0.8040 | 0.7742 | 70.12% | 70.02% | 79.85% | 0.7461 | 0.1909 | 0.95s |
+| **Baseline (Prior)** | 0.5500 | 0.5000 | 55.00% | 55.00% | 100.00% | 0.7097 | 0.2475 | 0.00s |
+
+---
+
+## 4. Key Takeaways & Discussion
+
+1. **Simple Baseline**: The majority prior baseline achieves 50.0% ROC-AUC and 55.0% accuracy, providing the statistical floor.
+2. **Logistic Regression vs. XGBoost**: Logistic Regression provides a strong, interpretable baseline (~0.774 ROC-AUC), while XGBoost captures subtle non-linear interactions (~0.776 ROC-AUC on validation, ~0.812 on held-out test).
+3. **Threshold Selection Effect**: Because missing a return is assumed to be 5× more costly than unnecessary customer friction ($25 vs $5), lowering the threshold to 0.17 pushes recall to 98.25%, minimizing expected operational loss at the expense of higher flag rate.

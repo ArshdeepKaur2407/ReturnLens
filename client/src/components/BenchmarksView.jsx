@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, Award, CheckCircle2, TrendingUp, BarChart3, Clock, AlertTriangle } from 'lucide-react';
+import { BarChart2, CheckCircle2, Award, Clock, ArrowUpDown } from 'lucide-react';
 
 export default function BenchmarksView() {
   const [benchmarks, setBenchmarks] = useState([]);
@@ -27,33 +27,37 @@ export default function BenchmarksView() {
   }, []);
 
   const sorted = [...benchmarks].sort((a, b) => {
-    return (b[sortKey] || 0) - (a[sortKey] || 0);
+    return (Number(b[sortKey]) || 0) - (Number(a[sortKey]) || 0);
   });
 
   return (
     <div className="space-y-6">
       {/* Overview Banner */}
-      <div className="glass-panel p-6 border-slate-800">
+      <div className="saas-card p-5 sm:p-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center space-x-2">
-              <Award className="w-5 h-5 text-amber-400" />
-              <h2 className="text-lg font-bold text-white">Multi-Model Benchmark & Selection Suite</h2>
+              <Award className="w-4 h-4 text-stone-700" />
+              <h2 className="text-sm font-semibold text-stone-900">Candidate Architecture Benchmarks & Selection</h2>
             </div>
-            <p className="text-xs text-slate-400 mt-1">
-              Evaluated on stratified internal validation split ($N=50,000$) using unified Scikit-Learn <code>ColumnTransformer</code> pipeline fit strictly on $X_{'{'}train{'}'}$.
+            <p className="text-xs text-stone-500 mt-1 max-w-2xl">
+              Evaluated on a stratified internal validation split (N = 20,000 orders) using a unified Scikit-Learn <code>ColumnTransformer</code> pipeline fitted strictly on training transactions.
             </p>
           </div>
-          <div className="flex items-center space-x-2 text-xs">
-            <span className="text-slate-400">Sort by:</span>
-            {['pr_auc', 'roc_auc', 'accuracy', 'recall', 'f1'].map((key) => (
+
+          <div className="flex items-center space-x-1.5 text-xs">
+            <span className="text-stone-500 text-[11px] mr-1 flex items-center space-x-1">
+              <ArrowUpDown className="w-3 h-3 text-stone-400" />
+              <span>Sort by:</span>
+            </span>
+            {['pr_auc', 'roc_auc', 'accuracy', 'f1', 'recall'].map((key) => (
               <button
                 key={key}
                 onClick={() => setSortKey(key)}
-                className={`px-2.5 py-1 rounded-md font-semibold uppercase text-[11px] border transition ${
+                className={`px-2.5 py-1 rounded-md text-[11px] font-medium uppercase border transition-colors ${
                   sortKey === key
-                    ? 'bg-cyan-950 text-cyan-300 border-cyan-800'
-                    : 'bg-slate-900/60 text-slate-400 border-slate-800 hover:text-slate-200'
+                    ? 'bg-stone-900 text-white border-stone-900 shadow-xs'
+                    : 'bg-white text-stone-600 border-border hover:bg-stone-50'
                 }`}
               >
                 {key.replace('_', ' ')}
@@ -63,63 +67,71 @@ export default function BenchmarksView() {
         </div>
       </div>
 
-      {/* 6 Models Comparison Table */}
-      <div className="glass-panel p-6 border-slate-800">
-        <h3 className="text-sm font-bold text-white mb-4">Candidate Model Architectures (Validation Split)</h3>
-        
+      {/* Model Comparison Table */}
+      <div className="saas-card overflow-hidden">
+        <div className="p-4 sm:p-5 border-b border-border flex items-center justify-between">
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-700">
+            Validation Split Benchmarks (N = 20,000 Orders)
+          </h3>
+          <span className="text-[11px] text-stone-500 font-mono">Stratified Seed: 42</span>
+        </div>
+
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead>
-              <tr className="border-b border-slate-800 text-slate-400 font-semibold uppercase tracking-wider">
-                <th className="pb-3 px-3">Architecture</th>
-                <th className="pb-3 px-3">PR-AUC (Primary)</th>
-                <th className="pb-3 px-3">ROC-AUC</th>
-                <th className="pb-3 px-3">Accuracy</th>
-                <th className="pb-3 px-3">Precision</th>
-                <th className="pb-3 px-3">Recall</th>
-                <th className="pb-3 px-3">F1 Score</th>
-                <th className="pb-3 px-3">Brier Score</th>
-                <th className="pb-3 px-3 text-right">Training Speed</th>
+              <tr className="bg-surface-subtle border-b border-border text-stone-500 font-semibold uppercase tracking-wider text-[11px]">
+                <th className="py-2.5 px-4">Architecture</th>
+                <th className="py-2.5 px-3">PR-AUC (Primary)</th>
+                <th className="py-2.5 px-3">ROC-AUC</th>
+                <th className="py-2.5 px-3">Accuracy</th>
+                <th className="py-2.5 px-3">Precision</th>
+                <th className="py-2.5 px-3">Recall</th>
+                <th className="py-2.5 px-3">F1 Score</th>
+                <th className="py-2.5 px-3">Brier Score</th>
+                <th className="py-2.5 px-4 text-right">Training Time</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/60 font-medium">
+            <tbody className="divide-y divide-border font-medium">
               {sorted.map((m, idx) => {
                 const isSelected = m.model_name.toLowerCase().includes('xgboost');
                 return (
-                  <tr key={idx} className={`hover:bg-slate-800/30 transition ${isSelected ? 'bg-blue-950/20' : ''}`}>
-                    <td className="py-3.5 px-3">
+                  <tr
+                    key={idx}
+                    className={`transition-colors ${isSelected ? 'bg-sage-50/40' : 'hover:bg-stone-50/70'}`}
+                  >
+                    <td className="py-3 px-4">
                       <div className="flex items-center space-x-2">
-                        <span className="font-bold text-slate-100">{m.model_name}</span>
+                        <span className="font-semibold text-stone-900">{m.model_name}</span>
                         {isSelected && (
-                          <span className="text-[10px] font-extrabold px-2 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-800">
-                            SELECTED
+                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-sage-100 text-sage-800 border border-sage-300">
+                            Selected Model
                           </span>
                         )}
                       </div>
                     </td>
-                    <td className="py-3.5 px-3">
-                      <span className="font-mono font-bold text-cyan-400">{Number(m.pr_auc).toFixed(4)}</span>
+                    <td className="py-3 px-3 font-mono font-semibold text-stone-900">
+                      {Number(m.pr_auc).toFixed(4)}
                     </td>
-                    <td className="py-3.5 px-3">
-                      <span className="font-mono text-slate-300">{Number(m.roc_auc).toFixed(4)}</span>
+                    <td className="py-3 px-3 font-mono text-stone-700">
+                      {Number(m.roc_auc).toFixed(4)}
                     </td>
-                    <td className="py-3.5 px-3">
-                      <span className="font-mono font-semibold text-emerald-400">{(Number(m.accuracy) * 100).toFixed(2)}%</span>
+                    <td className="py-3 px-3 font-mono text-stone-700">
+                      {(Number(m.accuracy) * 100).toFixed(2)}%
                     </td>
-                    <td className="py-3.5 px-3">
-                      <span className="font-mono text-slate-300">{(Number(m.precision) * 100).toFixed(2)}%</span>
+                    <td className="py-3 px-3 font-mono text-stone-700">
+                      {(Number(m.precision) * 100).toFixed(2)}%
                     </td>
-                    <td className="py-3.5 px-3">
-                      <span className="font-mono text-slate-300">{(Number(m.recall) * 100).toFixed(2)}%</span>
+                    <td className="py-3 px-3 font-mono text-stone-700">
+                      {(Number(m.recall) * 100).toFixed(2)}%
                     </td>
-                    <td className="py-3.5 px-3">
-                      <span className="font-mono text-slate-300">{Number(m.f1).toFixed(4)}</span>
+                    <td className="py-3 px-3 font-mono text-stone-700">
+                      {Number(m.f1).toFixed(4)}
                     </td>
-                    <td className="py-3.5 px-3">
-                      <span className="font-mono text-slate-400">{Number(m.brier_score).toFixed(4)}</span>
+                    <td className="py-3 px-3 font-mono text-stone-500">
+                      {Number(m.brier_score).toFixed(4)}
                     </td>
-                    <td className="py-3.5 px-3 text-right font-mono text-slate-400">
-                      {Number(m.training_time_sec).toFixed(2)}s
+                    <td className="py-3 px-4 text-right font-mono text-stone-500 text-[11px]">
+                      {Number(m.train_time_sec || m.training_time_sec || 0).toFixed(2)}s
                     </td>
                   </tr>
                 );
@@ -131,39 +143,53 @@ export default function BenchmarksView() {
 
       {/* Held-Out Test Evaluation Box */}
       {testMetrics && (
-        <div className="glass-panel p-6 border-slate-800 space-y-4">
-          <div className="flex items-center space-x-2 text-sm font-bold text-emerald-400">
-            <CheckCircle2 className="w-5 h-5" />
-            <span>Single-Pass Held-Out Test Evaluation (Generalization Standard, N=150,000)</span>
+        <div className="saas-card p-5 sm:p-6 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-border">
+            <div className="flex items-center space-x-2 text-stone-900 font-semibold text-xs">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+              <span>Held-Out Test Generalization Standard (N = 50,000 Unseen Orders)</span>
+            </div>
+            <span className="text-[11px] text-stone-500">
+              Evaluated strictly once on raw test events at standard cutoff (τ = 0.50)
+            </span>
           </div>
-          <p className="text-xs text-slate-400">
-            Frozen XGBoost pipeline evaluated strictly once on <code>event_table_testing.p</code> with zero prior parameter tuning or threshold peeking.
-          </p>
 
-          <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
-            <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 text-center">
-              <span className="text-[11px] text-slate-400">Test Accuracy</span>
-              <div className="text-xl font-extrabold text-emerald-400 mt-1">{(testMetrics.accuracy * 100).toFixed(2)}%</div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            <div className="p-3 rounded-lg bg-surface-subtle border border-border text-center">
+              <span className="text-[11px] text-stone-500 block">Accuracy</span>
+              <div className="text-lg font-bold font-mono text-stone-900 mt-0.5">
+                {(testMetrics.accuracy * 100).toFixed(2)}%
+              </div>
             </div>
-            <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 text-center">
-              <span className="text-[11px] text-slate-400">Test PR-AUC</span>
-              <div className="text-xl font-extrabold text-cyan-400 mt-1">{testMetrics.pr_auc.toFixed(4)}</div>
+            <div className="p-3 rounded-lg bg-surface-subtle border border-border text-center">
+              <span className="text-[11px] text-stone-500 block">PR-AUC</span>
+              <div className="text-lg font-bold font-mono text-stone-900 mt-0.5">
+                {testMetrics.pr_auc.toFixed(4)}
+              </div>
             </div>
-            <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 text-center">
-              <span className="text-[11px] text-slate-400">Test ROC-AUC</span>
-              <div className="text-xl font-extrabold text-blue-400 mt-1">{testMetrics.roc_auc.toFixed(4)}</div>
+            <div className="p-3 rounded-lg bg-surface-subtle border border-border text-center">
+              <span className="text-[11px] text-stone-500 block">ROC-AUC</span>
+              <div className="text-lg font-bold font-mono text-stone-900 mt-0.5">
+                {testMetrics.roc_auc.toFixed(4)}
+              </div>
             </div>
-            <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 text-center">
-              <span className="text-[11px] text-slate-400">Test Precision</span>
-              <div className="text-xl font-extrabold text-purple-400 mt-1">{(testMetrics.precision * 100).toFixed(2)}%</div>
+            <div className="p-3 rounded-lg bg-surface-subtle border border-border text-center">
+              <span className="text-[11px] text-stone-500 block">Precision</span>
+              <div className="text-lg font-bold font-mono text-stone-900 mt-0.5">
+                {(testMetrics.precision * 100).toFixed(2)}%
+              </div>
             </div>
-            <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 text-center">
-              <span className="text-[11px] text-slate-400">Test Recall</span>
-              <div className="text-xl font-extrabold text-amber-400 mt-1">{(testMetrics.recall * 100).toFixed(2)}%</div>
+            <div className="p-3 rounded-lg bg-surface-subtle border border-border text-center">
+              <span className="text-[11px] text-stone-500 block">Recall</span>
+              <div className="text-lg font-bold font-mono text-stone-900 mt-0.5">
+                {(testMetrics.recall * 100).toFixed(2)}%
+              </div>
             </div>
-            <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 text-center">
-              <span className="text-[11px] text-slate-400">Brier Score</span>
-              <div className="text-xl font-extrabold text-slate-200 mt-1">{testMetrics.brier_score.toFixed(4)}</div>
+            <div className="p-3 rounded-lg bg-surface-subtle border border-border text-center">
+              <span className="text-[11px] text-stone-500 block">Brier Score</span>
+              <div className="text-lg font-bold font-mono text-stone-900 mt-0.5">
+                {testMetrics.brier_score.toFixed(4)}
+              </div>
             </div>
           </div>
         </div>

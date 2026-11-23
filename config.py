@@ -21,18 +21,25 @@ REPORTS_DIR.mkdir(parents=True, exist_ok=True)
 # Random Seed for Reproducibility
 RANDOM_STATE = 42
 
-# Dataset File Paths
+# Dataset File Paths (Treated as strictly READ-ONLY)
+# The verified original un-enhanced event tables are event_table_training_raw.p and event_table_testing_raw.p
 CUSTOMER_NODES_TRAIN = DATA_DIR / "customer_nodes_training.p"
 CUSTOMER_NODES_TEST = DATA_DIR / "customer_nodes_testing.p"
 PRODUCT_NODES_TRAIN = DATA_DIR / "product_nodes_training.p"
 PRODUCT_NODES_TEST = DATA_DIR / "product_nodes_testing.p"
-EVENT_TABLE_TRAIN = DATA_DIR / "event_table_training.p"
-EVENT_TABLE_TEST = DATA_DIR / "event_table_testing.p"
+EVENT_TABLE_TRAIN_RAW = DATA_DIR / "event_table_training_raw.p"
+EVENT_TABLE_TEST_RAW = DATA_DIR / "event_table_testing_raw.p"
+
+# Active event tables used for training and testing (read verified raw labels directly)
+EVENT_TABLE_TRAIN = EVENT_TABLE_TRAIN_RAW
+EVENT_TABLE_TEST = EVENT_TABLE_TEST_RAW
 
 # Artifact File Paths
 MODEL_PATH = MODELS_DIR / "best_model.joblib"
 METADATA_PATH = MODELS_DIR / "feature_metadata.json"
 THRESHOLD_PATH = MODELS_DIR / "threshold.json"
+EVALUATION_JSON_PATH = REPORTS_DIR / "evaluation_results.json"
+TEST_METRICS_PATH = REPORTS_DIR / "test_evaluation_metrics.json"
 COMPARISON_CSV_PATH = REPORTS_DIR / "model_benchmarks.csv"
 COMPARISON_CHART_PATH = REPORTS_DIR / "model_comparison.png"
 CALIBRATION_CURVE_PATH = REPORTS_DIR / "calibration_curve.png"

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Terminal, Copy, Check, Code2, Globe, Send } from 'lucide-react';
+import { Code2, Copy, Check, ExternalLink } from 'lucide-react';
 
 export default function ApiExplorerView() {
   const [lang, setLang] = useState('curl');
@@ -21,21 +21,22 @@ export default function ApiExplorerView() {
   };
 
   const snippets = {
-    curl: `curl -X POST /api/predict \\
+    curl: `curl -X POST http://127.0.0.1:5050/api/predict \\
   -H "Content-Type: application/json" \\
   -d '${JSON.stringify(samplePayload, null, 2)}'`,
     
     node: `import axios from 'axios';
 
-const response = await axios.post('/api/predict', ${JSON.stringify(samplePayload, null, 2)});
+const payload = ${JSON.stringify(samplePayload, null, 2)};
 
+const response = await axios.post('http://127.0.0.1:5050/api/predict', payload);
 console.log('Return Risk Assessment:', response.data);`,
 
     python: `import requests
 
 payload = ${JSON.stringify(samplePayload, null, 2)}
 
-response = requests.post("/api/predict", json=payload)
+response = requests.post("http://127.0.0.1:5050/api/predict", json=payload)
 print(response.json())`
   };
 
@@ -47,28 +48,43 @@ print(response.json())`
 
   return (
     <div className="space-y-6">
-      <div className="glass-panel p-6 border-slate-800">
-        <div className="flex items-center space-x-2">
-          <Terminal className="w-5 h-5 text-cyan-400" />
-          <h2 className="text-lg font-bold text-white">Developer API Explorer & SDK Generator</h2>
+      {/* Overview Banner */}
+      <div className="saas-card p-5 sm:p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <div className="flex items-center space-x-2">
+              <Code2 className="w-4 h-4 text-stone-700" />
+              <h2 className="text-sm font-semibold text-stone-900">Developer API Explorer & SDK Snippets</h2>
+            </div>
+            <p className="text-xs text-stone-500 mt-1 max-w-2xl">
+              Integrate real-time return risk scoring and TreeSHAP attributions into pre-dispatch fulfillment or checkout pipelines.
+            </p>
+          </div>
+
+          <a
+            href="/docs"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-stone-900 hover:bg-stone-800 text-white font-medium text-xs shadow-xs transition-colors self-start sm:self-auto"
+          >
+            <span>Open Swagger / OpenAPI Docs</span>
+            <ExternalLink className="w-3.5 h-3.5 text-stone-300" />
+          </a>
         </div>
-        <p className="text-xs text-slate-400 mt-1">
-            Integrate ReturnLens return-risk scoring into pre-dispatch fulfillment or custom e-commerce checkout flows.
-        </p>
       </div>
 
       {/* Code Viewer Panel */}
-      <div className="glass-panel p-6 border-slate-800 space-y-4">
-        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-          <div className="flex items-center space-x-2">
+      <div className="saas-card p-5 sm:p-6 space-y-4">
+        <div className="flex items-center justify-between pb-3 border-b border-border">
+          <div className="flex items-center space-x-1">
             {['curl', 'node', 'python'].map((l) => (
               <button
                 key={l}
                 onClick={() => setLang(l)}
-                className={`px-3 py-1 rounded-lg text-xs font-semibold uppercase border transition ${
+                className={`px-3 py-1 rounded-md text-xs font-medium uppercase transition-colors ${
                   lang === l
-                    ? 'bg-cyan-950 text-cyan-300 border-cyan-800'
-                    : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                    ? 'bg-stone-900 text-white shadow-xs'
+                    : 'bg-surface-subtle text-stone-600 hover:text-stone-900 hover:bg-stone-100 border border-border'
                 }`}
               >
                 {l}
@@ -78,36 +94,43 @@ print(response.json())`
 
           <button
             onClick={handleCopy}
-            className="flex items-center space-x-1.5 px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 border border-slate-700 transition"
+            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-stone-50 text-xs font-medium text-stone-700 border border-border shadow-xs transition-colors"
           >
-            {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-            <span>{copied ? 'Copied!' : 'Copy Code'}</span>
+            {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5 text-stone-400" />}
+            <span>{copied ? 'Copied' : 'Copy Snippet'}</span>
           </button>
         </div>
 
-        <pre className="p-4 rounded-xl bg-slate-950 border border-slate-800 text-cyan-300 font-mono text-xs overflow-x-auto">
-          {snippets[lang]}
-        </pre>
+        {/* Code Snippet Box */}
+        <div className="rounded-lg bg-stone-950 p-4 border border-stone-800 overflow-x-auto">
+          <pre className="text-stone-200 font-mono text-xs leading-relaxed">
+            {snippets[lang]}
+          </pre>
+        </div>
 
         {/* Expected JSON Response Spec */}
-        <div className="pt-4 border-t border-slate-800 space-y-2">
-          <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">Example API Response Payload:</span>
-          <pre className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 text-slate-200 font-mono text-xs overflow-x-auto">
+        <div className="pt-3 border-t border-border space-y-2">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-stone-500 block">
+            Example API Response Payload:
+          </span>
+          <div className="rounded-lg bg-surface-subtle p-4 border border-border overflow-x-auto">
+            <pre className="text-stone-800 font-mono text-xs leading-relaxed">
 {`{
-  "return_probability": 0.8842,
-  "risk_category": "VERY_HIGH",
-  "decision": "MANUAL_REVIEW_OR_PREPAID",
-  "recommendation": "Very high risk. Manual review or require prepaid verification before fulfillment.",
-  "expected_loss": 22.10,
+  "return_probability": 0.7649,
+  "risk_category": "HIGH",
+  "decision": "💬 Proactive Sizing Fit Prompt (High Return Risk)",
+  "recommendation": "High risk. Apply targeted friction (e.g. sizing confirmation, return policy prompt).",
+  "expected_loss": 19.12,
   "top_factors": [
-    "High Customer Historical Return Rate (46.7%) (+1.840 SHAP impact)",
-    "Elevated Product Sizing Mismatch Rate (43.8%) (+0.562 SHAP impact)",
-    "High Item Value (£55.00) (+0.124 SHAP impact)"
+    "Customer Historical Return Rate (66.7%) (+0.495 SHAP log-odds impact)",
+    "Item Promotional Discount Depth (+0.151 SHAP log-odds impact)",
+    "Historical Return Reason Pattern (Fit / Sizing / Style) (+0.091 SHAP log-odds impact)"
   ],
-  "optimal_threshold": 0.19,
+  "optimal_threshold": 0.17,
   "action_flag": true
 }`}
-          </pre>
+            </pre>
+          </div>
         </div>
       </div>
     </div>

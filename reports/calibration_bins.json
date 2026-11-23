@@ -1,0 +1,62 @@
+[
+  {
+    "bin_range":"0.00 - 0.10",
+    "mean_predicted_prob":0.0493,
+    "empirical_return_rate":0.0626,
+    "count":942
+  },
+  {
+    "bin_range":"0.10 - 0.20",
+    "mean_predicted_prob":0.1491,
+    "empirical_return_rate":0.1572,
+    "count":1075
+  },
+  {
+    "bin_range":"0.20 - 0.30",
+    "mean_predicted_prob":0.2504,
+    "empirical_return_rate":0.2634,
+    "count":1488
+  },
+  {
+    "bin_range":"0.30 - 0.40",
+    "mean_predicted_prob":0.3536,
+    "empirical_return_rate":0.3324,
+    "count":1742
+  },
+  {
+    "bin_range":"0.40 - 0.50",
+    "mean_predicted_prob":0.4518,
+    "empirical_return_rate":0.453,
+    "count":1991
+  },
+  {
+    "bin_range":"0.50 - 0.60",
+    "mean_predicted_prob":0.5557,
+    "empirical_return_rate":0.559,
+    "count":4866
+  },
+  {
+    "bin_range":"0.60 - 0.70",
+    "mean_predicted_prob":0.65,
+    "empirical_return_rate":0.6414,
+    "count":2072
+  },
+  {
+    "bin_range":"0.70 - 0.80",
+    "mean_predicted_prob":0.7498,
+    "empirical_return_rate":0.7373,
+    "count":2410
+  },
+  {
+    "bin_range":"0.80 - 0.90",
+    "mean_predicted_prob":0.8421,
+    "empirical_return_rate":0.8544,
+    "count":1751
+  },
+  {
+    "bin_range":"0.90 - 1.00",
+    "mean_predicted_prob":0.9534,
+    "empirical_return_rate":0.9483,
+    "count":1663
+  }
+]

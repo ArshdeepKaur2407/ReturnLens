@@ -1,16 +1,39 @@
 {
-  "roc_auc": 0.9683,
-  "pr_auc": 0.9775,
-  "brier_score": 0.0717,
-  "accuracy": 0.8967,
-  "precision": 0.9021,
-  "recall": 0.9204,
-  "f1": 0.9111,
+  "roc_auc": 0.8119,
+  "pr_auc": 0.8418,
+  "brier_score": 0.1754,
+  "accuracy": 0.7323,
+  "precision": 0.744,
+  "recall": 0.7847,
+  "f1": 0.7638,
   "threshold": 0.5,
   "confusion_matrix": {
-    "TN": 55023,
-    "FP": 8629,
-    "FN": 6873,
-    "TP": 79475
+    "TN": 14966,
+    "FP": 7449,
+    "FN": 5938,
+    "TP": 21647
+  },
+  "at_selected_threshold": {
+    "threshold": 0.17,
+    "accuracy": 0.6411,
+    "precision": 0.6081,
+    "recall": 0.9825,
+    "f1": 0.7513,
+    "roc_auc": 0.8119,
+    "pr_auc": 0.8418,
+    "brier_score": 0.1754,
+    "confusion_matrix": {
+      "TN": 4952,
+      "FP": 17463,
+      "FN": 483,
+      "TP": 27102
+    },
+    "cost_analysis": {
+      "baseline_cost": 689625.0,
+      "incurred_cost": 99390.0,
+      "estimated_savings": 590235.0,
+      "savings_percent": 85.59,
+      "flag_rate": 0.8913
+    }
   }
 }

@@ -1,16 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, Download, CheckCircle2, ShieldAlert } from 'lucide-react';
+import { FileText, Copy, Check, ExternalLink } from 'lucide-react';
 
 export default function AuditReportsView() {
   const [selectedReport, setSelectedReport] = useState('final_test_results');
   const [content, setContent] = useState('');
   const [loading, setLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const reports = [
     { id: 'final_test_results', label: 'Single-Pass Test Results', file: 'final_test_results.md' },
     { id: 'data_audit', label: 'Dataset Audit Report', file: 'data_audit.md' },
-    { id: 'leakage_audit', label: 'Anti-Leakage Audit', file: 'leakage_audit.md' },
-    { id: 'business_impact', label: 'Business ROI & Losses', file: 'business_impact.md' },
+    { id: 'leakage_audit', label: 'Leakage & Preprocessor Audit', file: 'leakage_audit.md' },
+    { id: 'business_impact', label: 'Business Cost Impact', file: 'business_impact.md' },
   ];
 
   useEffect(() => {
@@ -29,29 +30,47 @@ export default function AuditReportsView() {
     loadReport();
   }, [selectedReport]);
 
+  const handleCopy = () => {
+    navigator.clipboard.writeText(content);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   return (
     <div className="space-y-6">
-      <div className="glass-panel p-6 border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center space-x-2">
-            <FileText className="w-5 h-5 text-cyan-400" />
-            <h2 className="text-lg font-bold text-white">System Audit & Transparency Documentation</h2>
+      {/* Top Banner & Selector */}
+      <div className="saas-card p-5 sm:p-6 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <div className="flex items-center space-x-2">
+              <FileText className="w-4 h-4 text-stone-700" />
+              <h2 className="text-sm font-semibold text-stone-900">System Audit & Transparency Documentation</h2>
+            </div>
+            <p className="text-xs text-stone-500 mt-1 max-w-2xl">
+              Authentic reports generated directly from frozen pipeline artifacts, unperturbed raw labels, and dataset integrity checks.
+            </p>
           </div>
-          <p className="text-xs text-slate-400 mt-1">
-            Official reports generated directly from frozen pipeline artifacts and raw dataset audits.
-          </p>
+
+          <button
+            type="button"
+            onClick={handleCopy}
+            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-stone-50 border border-border text-xs font-medium text-stone-700 shadow-xs transition-colors self-start sm:self-auto"
+          >
+            {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5 text-stone-400" />}
+            <span>{copied ? 'Copied' : 'Copy Markdown'}</span>
+          </button>
         </div>
 
-        {/* Report Selector Pills */}
-        <div className="flex items-center space-x-2 overflow-x-auto pb-1">
+        {/* Report Selector Tabs */}
+        <div className="flex items-center space-x-1.5 overflow-x-auto pt-2 border-t border-border">
           {reports.map((r) => (
             <button
               key={r.id}
               onClick={() => setSelectedReport(r.id)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap border transition ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
                 selectedReport === r.id
-                  ? 'bg-blue-600/30 border-cyan-500/60 text-white shadow-md'
-                  : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                  ? 'bg-stone-900 text-white shadow-xs'
+                  : 'bg-surface-subtle text-stone-600 hover:text-stone-900 hover:bg-stone-100 border border-border'
               }`}
             >
               {r.label}
@@ -60,13 +79,15 @@ export default function AuditReportsView() {
         </div>
       </div>
 
-      {/* Markdown Document Container */}
-      <div className="glass-panel p-8 border-slate-800">
+      {/* Markdown Document Content */}
+      <div className="saas-card p-5 sm:p-7">
         {loading ? (
-          <div className="text-center py-12 text-slate-400 text-xs animate-pulse">Loading report document...</div>
+          <div className="text-center py-16 text-stone-400 text-xs font-medium">
+            Loading report content...
+          </div>
         ) : (
-          <div className="prose prose-invert max-w-none text-xs leading-relaxed space-y-4">
-            <pre className="p-6 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 font-mono text-xs whitespace-pre-wrap overflow-x-auto">
+          <div className="overflow-x-auto">
+            <pre className="p-5 rounded-lg bg-surface-subtle border border-border text-stone-800 font-mono text-xs whitespace-pre-wrap leading-relaxed">
               {content}
             </pre>
           </div>

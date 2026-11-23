@@ -21,6 +21,7 @@ ENV/
 *.log
 scratch/
 .system_generated/
+_backup_pre_revision/
 
 # Raw Dataset (over 800MB - exclude from Git, inference uses models/)
 Dataset/
