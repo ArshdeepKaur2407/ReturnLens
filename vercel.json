@@ -16,7 +16,8 @@
           "models/**",
           "src/**",
           "config.py",
-          "api/**"
+          "api/**",
+          "reports/**"
         ]
       }
     }
